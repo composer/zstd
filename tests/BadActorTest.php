@@ -49,7 +49,6 @@ class BadActorTest extends TestCase
             'unprintable entry type' => [(new TarBuilder())->entry('a', "\e"), '{^Unsupported entry type \'\?\' for "a"$}'],
 
             // symlinks
-            'symlinks too expensive to verify' => [self::symlinkMaze(), '{^Symlinks take too many steps to verify$}'],
             'absolute symlink' => [(new TarBuilder())->symlink('evil', '/etc/passwd'), '{unsafe symlink}i'],
             'backslash symlink' => [(new TarBuilder())->symlink('evil', '..\\outside'), '{unsafe symlink}i'],
             'empty symlink target' => [(new TarBuilder())->symlink('evil', ''), '{unsafe symlink}i'],
@@ -80,6 +79,7 @@ class BadActorTest extends TestCase
                 'symlink escaping through chain' => [(new TarBuilder())->symlink('a', 'b')->symlink('b', 'c/..')->symlink('c', '../outside'), '{resolves outside}'],
                 'symlink loop' => [(new TarBuilder())->symlink('a', 'b')->symlink('b', 'a'), '{resolves outside}'],
                 'symlink self loop' => [(new TarBuilder())->symlink('a', 'a'), '{resolves outside}'],
+                'symlinks too expensive to verify' => [self::symlinkMaze(), '{^Symlinks take too many steps to verify$}'],
             ];
         }
 
@@ -134,13 +134,13 @@ class BadActorTest extends TestCase
     }
 
     /**
-     * Symlinks with 1401 component targets, enough of them to walk over a million components.
+     * Symlinks with 401 component targets (macOS caps targets at 1023 bytes), enough to walk over a million components.
      */
     private static function symlinkMaze(): TarBuilder
     {
         $tar = (new TarBuilder())->dir('d');
-        $target = str_repeat('d/../', 700).'d';
-        for ($i = 0; $i < 750; $i++) {
+        $target = str_repeat('d/../', 200).'d';
+        for ($i = 0; $i < 2600; $i++) {
             $tar->gnuLong('l'.$i, '2', '', $target);
         }
 
