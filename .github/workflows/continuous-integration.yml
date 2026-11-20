@@ -1,0 +1,104 @@
+name: "Continuous Integration"
+
+on:
+  - push
+  - pull_request
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: "CI (PHP ${{ matrix.php-version }}, ${{ matrix.os }})"
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version:
+          - "7.2"
+          - "7.3"
+          - "7.4"
+          - "8.0"
+          - "8.1"
+          - "8.2"
+          - "8.3"
+          - "8.4"
+          - "8.5"
+        os: [ubuntu-latest]
+        # every extraction method must be tested; Windows runners may lack the zstd CLI or a PECL build
+        require-methods: ["ext-zstd,bundled,zstd-cli,php"]
+        include:
+          - php-version: "8.4"
+            os: ubuntu-24.04-arm
+            require-methods: "ext-zstd,bundled,zstd-cli,php"
+          - php-version: "7.2"
+            os: macos-latest
+            require-methods: "ext-zstd,bundled,zstd-cli,php"
+          - php-version: "8.4"
+            os: macos-latest
+            require-methods: "ext-zstd,bundled,zstd-cli,php"
+          - php-version: "7.2"
+            os: windows-latest
+            require-methods: "bundled,php"
+          - php-version: "8.4"
+            os: windows-latest
+            require-methods: "bundled,php"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: "${{ matrix.php-version }}"
+          extensions: zstd
+          coverage: none
+
+      - name: Install the zstd CLI (Linux)
+        if: runner.os == 'Linux'
+        run: command -v zstd || sudo apt-get install -y zstd
+
+      - name: Install the zstd CLI (macOS)
+        if: runner.os == 'macOS'
+        run: command -v zstd || brew install zstd
+
+      # test the current C sources, not just the committed binaries
+      - name: Build native binary (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          native/build-linux.sh
+          echo "ZSTD_EXTRACT_BINARY=$PWD/native/build/zstd-extract-linux-$(uname -m)" >> "$GITHUB_ENV"
+
+      - name: Build native binary (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          make -C native darwin
+          echo "ZSTD_EXTRACT_BINARY=$PWD/native/build/zstd-extract-darwin" >> "$GITHUB_ENV"
+
+      - name: Build native binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmd /c native\build-windows.cmd
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          "ZSTD_EXTRACT_BINARY=$PWD\native\build\zstd-extract-windows-x86_64.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Remove PHPStan on PHP < 7.4
+        if: matrix.php-version == '7.2' || matrix.php-version == '7.3'
+        run: composer remove --dev --no-update phpstan/phpstan phpstan/phpstan-strict-rules phpstan/phpstan-deprecation-rules
+
+      - uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
+        with:
+          dependency-versions: highest
+
+      - name: Run tests
+        env:
+          ZSTD_TEST_REQUIRE_METHODS: ${{ matrix.require-methods }}
+        run: vendor/bin/phpunit

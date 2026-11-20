@@ -1,0 +1,129 @@
+name: "Build native binaries"
+
+# Reusable: builds the zstd-extract binaries on each platform's native toolchain, twice to make sure the build is
+# deterministic, and uploads them with their checksums as the "zstd-extract-binaries" artifact.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: "Linux ${{ matrix.arch }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          bin="native/build/zstd-extract-linux-$ARCH"
+          native/build-linux.sh
+          cp "$bin" "$RUNNER_TEMP/first"
+          rm -rf native/build
+          native/build-linux.sh
+          cmp "$RUNNER_TEMP/first" "$bin" # the build must be reproducible
+          file "$bin" | grep -q 'static-pie linked'
+          readelf -hW "$bin" | grep -q 'Type: *DYN' # position independent, for ASLR
+          "$bin" --version
+          "$bin" tests/Fixtures/level19.tar.zst "$RUNNER_TEMP/smoke"
+          test -L "$RUNNER_TEMP/smoke/link-to-script"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-${{ matrix.arch }}
+          path: native/build/zstd-extract-linux-${{ matrix.arch }}
+          if-no-files-found: error
+
+  darwin:
+    name: "macOS universal"
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build
+        run: |
+          bin=native/build/zstd-extract-darwin
+          make -C native darwin
+          cp "$bin" "$RUNNER_TEMP/first"
+          make -C native clean darwin
+          cmp "$RUNNER_TEMP/first" "$bin" # the build must be reproducible
+          lipo -archs "$bin" | grep -q 'x86_64 arm64'
+          codesign --verify "$bin"
+          "$bin" --version
+          "$bin" tests/Fixtures/level19.tar.zst "$RUNNER_TEMP/smoke"
+          test -L "$RUNNER_TEMP/smoke/link-to-script"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: darwin
+          path: native/build/zstd-extract-darwin
+          if-no-files-found: error
+
+  windows:
+    name: "Windows x86_64"
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $bin = 'native\build\zstd-extract-windows-x86_64.exe'
+          cmd /c native\build-windows.cmd
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Copy-Item $bin "$env:RUNNER_TEMP\first.exe"
+          Remove-Item -Recurse native\build
+          cmd /c native\build-windows.cmd
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          # the build must be reproducible
+          if ((Get-FileHash $bin).Hash -ne (Get-FileHash "$env:RUNNER_TEMP\first.exe").Hash) { Write-Error 'non-deterministic build'; exit 1 }
+          & $bin --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          & $bin tests\Fixtures\level19.tar.zst "$env:RUNNER_TEMP\smoke"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if (-not (Test-Path "$env:RUNNER_TEMP\smoke\link-to-script" -PathType Leaf)) { exit 1 }
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-x86_64
+          path: native/build/zstd-extract-windows-x86_64.exe
+          if-no-files-found: error
+
+  collect:
+    name: "Collect"
+    needs: [linux, darwin, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: bin
+          pattern: '{linux-*,darwin,windows-*}'
+          merge-multiple: true
+
+      - name: Checksums
+        run: |
+          chmod +x bin/zstd-extract-*
+          cd bin && LC_ALL=C sha256sum zstd-extract-* | tee SHA256SUMS
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zstd-extract-binaries
+          path: bin/
+          if-no-files-found: error

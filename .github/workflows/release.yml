@@ -1,0 +1,68 @@
+name: "Release binaries"
+
+# Rebuilds the binaries from the release tag, checks they are byte-identical to the committed bin/, then attests
+# the build (so the provenance covers the build steps of this run) and attaches the files to the release.
+# As the files are identical, the attestation covers bin/ in the tagged commit as well:
+#   gh attestation verify bin/zstd-extract-linux-x86_64 --repo composer/zstd
+# Release soon after merging: runner image updates can change the toolchains, and with them the binaries.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  publish:
+    name: "Attest and attach"
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to upload release assets
+      id-token: write # to sign the attestation with the workflow's OIDC identity
+      attestations: write # to store the attestation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: zstd-extract-binaries
+          path: ${{ runner.temp }}/built
+
+      - name: Compare with the committed bin/
+        run: .github/scripts/compare-binaries.sh "$RUNNER_TEMP/built"
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: '${{ runner.temp }}/built/zstd-extract-*'
+
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          cp LICENSE bin/LICENSE.zstd bin/LICENSE.musl "$RUNNER_TEMP/built/"
+          cd "$RUNNER_TEMP/built"
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber zstd-extract-* SHA256SUMS LICENSE LICENSE.zstd LICENSE.musl
+
+      - name: Check the uploaded assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/assets"
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'zstd-extract-*' --pattern SHA256SUMS --dir "$RUNNER_TEMP/assets"
+          (cd "$RUNNER_TEMP/assets" && sha256sum --check --strict SHA256SUMS)
+          cmp bin/SHA256SUMS "$RUNNER_TEMP/assets/SHA256SUMS"

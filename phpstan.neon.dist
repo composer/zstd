@@ -1,0 +1,20 @@
+parameters:
+    level: 9
+    paths:
+        - src
+        - tests
+
+    treatPhpDocTypesAsCertain: false
+
+    ignoreErrors:
+        # unpack() only returns false when reading past the end, which the decoder's padding rules out (and its error
+        # handler turns into an exception anyway); checking it on every bitstream refill costs measurable throughput
+        -
+            identifier: offsetAccess.nonOffsetAccessible
+            message: '#^Cannot access offset (1|int) on array\|false\.$#'
+            path: src/ZstdDecoder.php
+
+includes:
+    - vendor/phpstan/phpstan/conf/bleedingEdge.neon
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/phpstan/phpstan-deprecation-rules/rules.neon

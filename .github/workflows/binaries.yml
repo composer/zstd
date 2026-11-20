@@ -1,0 +1,49 @@
+name: "Native binaries"
+
+# bin/ must always be byte-identical to a fresh build of native/. When it is not, the job prints how to update it
+# from this run's artifact.
+
+on:
+  push:
+    paths:
+      - 'bin/**'
+      - 'native/**'
+      - '.github/workflows/binaries.yml'
+      - '.github/workflows/build.yml'
+      - '.github/scripts/compare-binaries.sh'
+  pull_request:
+    paths:
+      - 'bin/**'
+      - 'native/**'
+      - '.github/workflows/binaries.yml'
+      - '.github/workflows/build.yml'
+      - '.github/scripts/compare-binaries.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  compare:
+    name: "Compare with bin/"
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: zstd-extract-binaries
+          path: ${{ runner.temp }}/built
+
+      - name: Compare
+        run: .github/scripts/compare-binaries.sh "$RUNNER_TEMP/built"

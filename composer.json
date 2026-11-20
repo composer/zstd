@@ -1,0 +1,51 @@
+{
+    "name": "composer/zstd",
+    "description": "Safe .tar.zst extraction using ext-zstd, a bundled native binary, the zstd CLI or pure PHP, with identical results.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "zstd",
+        "zstandard",
+        "tar",
+        "archive",
+        "extract"
+    ],
+    "authors": [
+        {
+            "name": "Jordi Boggiano",
+            "email": "j.boggiano@seld.be",
+            "homepage": "http://seld.be"
+        }
+    ],
+    "require": {
+        "php": "^7.2.5 || ^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^8.5 || ^9.6",
+        "phpstan/phpstan": "^2",
+        "phpstan/phpstan-strict-rules": "^2",
+        "phpstan/phpstan-deprecation-rules": "^2"
+    },
+    "suggest": {
+        "ext-zstd": "Fastest extraction, without running an external binary"
+    },
+    "autoload": {
+        "psr-4": {
+            "Composer\\Zstd\\": "src"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Composer\\Zstd\\Tests\\": "tests"
+        }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.x-dev"
+        }
+    },
+    "scripts": {
+        "test": "@php vendor/bin/phpunit",
+        "phpstan": "@php vendor/bin/phpstan analyse"
+    }
+}
