@@ -1,0 +1,150 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "component": {
+      "type": "application",
+      "bom-ref": "zstd-extract",
+      "name": "zstd-extract-linux-aarch64",
+      "version": "1.0.0",
+      "supplier": {
+        "name": "Composer",
+        "url": [
+          "https://github.com/composer/zstd"
+        ]
+      },
+      "hashes": [
+        {
+          "alg": "SHA-256",
+          "content": "12f06a18d69849ffc1eb9aff6ff11c955872fa4fc1fe9ac868708a911093413c"
+        }
+      ],
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ]
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "zstd",
+      "name": "zstd",
+      "version": "1.5.7",
+      "description": "Decoder only (lib/common and lib/decompress), built without legacy format support",
+      "licenses": [
+        {
+          "license": {
+            "id": "BSD-3-Clause"
+          }
+        }
+      ],
+      "cpe": "cpe:2.3:a:facebook:zstandard:1.5.7:*:*:*:*:*:*:*",
+      "purl": "pkg:github/facebook/zstd@v1.5.7",
+      "externalReferences": [
+        {
+          "type": "distribution",
+          "url": "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz",
+          "hashes": [
+            {
+              "alg": "SHA-256",
+              "content": "eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "musl",
+      "name": "musl",
+      "version": "1.2.6-r3",
+      "licenses": [
+        {
+          "license": {
+            "id": "MIT"
+          }
+        }
+      ],
+      "purl": "pkg:apk/alpine/musl@1.2.6-r3?arch=aarch64&distro=alpine-3.24"
+    },
+    {
+      "type": "library",
+      "bom-ref": "libgcc",
+      "name": "libgcc",
+      "version": "15.2.0-r5",
+      "licenses": [
+        {
+          "expression": "GPL-3.0-or-later WITH GCC-exception-3.1"
+        }
+      ],
+      "purl": "pkg:apk/alpine/gcc@15.2.0-r5?arch=aarch64&distro=alpine-3.24"
+    },
+    {
+      "type": "library",
+      "bom-ref": "fortify-headers",
+      "name": "fortify-headers",
+      "version": "3.0.1-r2",
+      "licenses": [
+        {
+          "license": {
+            "id": "0BSD"
+          }
+        }
+      ],
+      "purl": "pkg:apk/alpine/fortify-headers@3.0.1-r2?arch=aarch64&distro=alpine-3.24"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "zstd-extract",
+      "dependsOn": [
+        "zstd",
+        "musl",
+        "libgcc",
+        "fortify-headers"
+      ]
+    }
+  ],
+  "formulation": [
+    {
+      "components": [
+        {
+          "type": "application",
+          "name": "gcc",
+          "version": "15.2.0-r5",
+          "licenses": [
+            {
+              "license": {
+                "id": "GPL-3.0-or-later"
+              }
+            }
+          ],
+          "purl": "pkg:apk/alpine/gcc@15.2.0-r5?arch=aarch64&distro=alpine-3.24"
+        },
+        {
+          "type": "application",
+          "name": "binutils",
+          "version": "2.45.1-r1",
+          "licenses": [
+            {
+              "license": {
+                "id": "GPL-3.0-or-later"
+              }
+            }
+          ],
+          "purl": "pkg:apk/alpine/binutils@2.45.1-r1?arch=aarch64&distro=alpine-3.24"
+        },
+        {
+          "type": "container",
+          "name": "ghcr.io/composer/zstd-builder",
+          "version": "sha256:0ba4ec79a3cd95e656004e2fc527d8c160a450b83f733a49383f69f6ee48a968"
+        }
+      ]
+    }
+  ]
+}
