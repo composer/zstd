@@ -13,6 +13,7 @@ docker run --rm -v "$PWD:/src:ro" -v "$PWD/build:/out" -e OWNER="$(id -u):$(id -
     cp -r /src /tmp/native
     rm -rf /tmp/native/build
     make -s -C /tmp/native linux
+    echo "#include <string.h>" | gcc -O2 -D_FORTIFY_SOURCE=2 -E - | grep -q /fortify/string.h # fortify is really on
     cp /tmp/native/build/zstd-extract-linux-* /out/
     chown "$OWNER" /out/zstd-extract-linux-*
 '

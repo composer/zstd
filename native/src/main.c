@@ -24,6 +24,8 @@
 #else
 #  define _POSIX_C_SOURCE 200809L
 #  define _DEFAULT_SOURCE
+/* for dl_iterate_phdr() with glibc */
+#  define _GNU_SOURCE
 /* _POSIX_C_SOURCE hides O_NOFOLLOW on macOS */
 #  define _DARWIN_C_SOURCE
 #  include <dirent.h>
@@ -31,6 +33,10 @@
 #  include <sys/stat.h>
 #  include <sys/types.h>
 #  include <unistd.h>
+#  if defined(__linux__)
+#    include <link.h>
+#    include <sys/mman.h>
+#  endif
 #endif
 
 #include <errno.h>
@@ -755,6 +761,24 @@ static void extract(FILE *f)
     ZSTD_freeDStream(r.ds);
 }
 
+#if defined(__linux__)
+/* musl's static-pie startup leaves the RELRO segment (GOT, init/fini arrays) writable, unlike a dynamic loader */
+static int protect_relro(struct dl_phdr_info *info, size_t size, void *data)
+{
+    uintptr_t page = (uintptr_t)sysconf(_SC_PAGESIZE);
+    (void)size;
+    (void)data;
+    for (int i = 0; i < info->dlpi_phnum; i++) {
+        const ElfW(Phdr) *ph = &info->dlpi_phdr[i];
+        if (ph->p_type != PT_GNU_RELRO) continue;
+        uintptr_t start = (info->dlpi_addr + ph->p_vaddr) & ~(page - 1);
+        uintptr_t end = (info->dlpi_addr + ph->p_vaddr + ph->p_memsz) & ~(page - 1);
+        if (end > start) mprotect((void *)start, end - start, PROT_READ);
+    }
+    return 1; /* the first object is the executable itself */
+}
+#endif
+
 #if defined(_WIN32)
 int wmain(int argc, wchar_t **wargv)
 {
@@ -768,6 +792,9 @@ int wmain(int argc, wchar_t **wargv)
 #else
 int main(int argc, char **argv)
 {
+#  if defined(__linux__)
+    dl_iterate_phdr(protect_relro, NULL);
+#  endif
 #endif
     if (argc == 2 && !strcmp(argv[1], "--version")) {
         printf("zstd-extract %s (zstd %s)\n", EXTRACT_VERSION, ZSTD_versionString());

@@ -37,6 +37,15 @@ jobs:
           cmp "$RUNNER_TEMP/first" "$bin" # the build must be reproducible
           file "$bin" | grep -q 'static-pie linked'
           readelf -hW "$bin" | grep -q 'Type: *DYN' # position independent, for ASLR
+          # arm64 kernels use pages of up to 64K, the segments must be aligned for them
+          if [ "$ARCH" = aarch64 ]; then readelf -lW "$bin" | awk '$1 == "LOAD" && $NF != "0x10000" { bad = 1 } END { exit bad }'; fi
+          # RELRO must be applied at runtime: musl's static-pie startup does not do it, main() does
+          mkfifo "$RUNNER_TEMP/fifo"
+          "$bin" "$RUNNER_TEMP/fifo" "$RUNNER_TEMP/blocked" & # blocks opening the archive
+          sleep 1
+          relro=$(readelf -lW "$bin" | awk '$1 == "GNU_RELRO" { print $2 }')
+          grep -q " r--p $(printf '%08x' $((relro & ~4095))) .*zstd-extract" "/proc/$!/maps"
+          kill $!
           "$bin" --version
           "$bin" tests/Fixtures/level19.tar.zst "$RUNNER_TEMP/smoke"
           test -L "$RUNNER_TEMP/smoke/link-to-script"
