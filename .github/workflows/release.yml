@@ -1,7 +1,8 @@
 name: "Release binaries"
 
 # Rebuilds the binaries from the release tag, checks they are byte-identical to the committed bin/, then attests
-# the build (so the provenance covers the build steps of this run) and attaches the files to the release.
+# the build (so the provenance covers the build steps of this run) and each binary's SBOM, and attaches the files to
+# the release.
 # As the files are identical, the attestation covers bin/ in the tagged commit as well:
 #   gh attestation verify bin/zstd-extract-linux-x86_64 --repo composer/zstd
 # Release soon after merging: macOS and Windows runner image updates can change the toolchains, and the binaries.
@@ -45,6 +46,26 @@ jobs:
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: '${{ runner.temp }}/built/zstd-extract-*'
+
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: '${{ runner.temp }}/built/zstd-extract-linux-x86_64'
+          sbom-path: '${{ runner.temp }}/built/zstd-extract-linux-x86_64.cdx.json'
+
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: '${{ runner.temp }}/built/zstd-extract-linux-aarch64'
+          sbom-path: '${{ runner.temp }}/built/zstd-extract-linux-aarch64.cdx.json'
+
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: '${{ runner.temp }}/built/zstd-extract-darwin'
+          sbom-path: '${{ runner.temp }}/built/zstd-extract-darwin.cdx.json'
+
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: '${{ runner.temp }}/built/zstd-extract-windows-x86_64.exe'
+          sbom-path: '${{ runner.temp }}/built/zstd-extract-windows-x86_64.exe.cdx.json'
 
       - name: Upload
         env:

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Checks that bin/ is byte-identical to a fresh build (the zstd-extract-binaries artifact in $1).
+# Checks that bin/, binaries and SBOMs, is byte-identical to a fresh build (the zstd-extract-binaries artifact in $1).
 set -euo pipefail
 
 built=$1
@@ -19,6 +19,11 @@ for name in zstd-extract-linux-x86_64 zstd-extract-linux-aarch64 zstd-extract-da
         echo "::error file=$file::differs from a fresh build of native/"
         fail=1
     fi
+    # shows what changed in the toolchain when that is why the binary differs
+    if ! diff -u "$file.cdx.json" "$built/$name.cdx.json"; then
+        echo "::error file=$file.cdx.json::differs from the fresh build's SBOM"
+        fail=1
+    fi
     mode=$(git ls-files --stage -- "$file" | cut -d' ' -f1)
     if [ "$mode" != "100755" ]; then
         echo "::error file=$file::must be committed as executable (git mode is ${mode:-untracked})"
@@ -33,7 +38,7 @@ fi
 if [ "$fail" -ne 0 ]; then
     echo "bin/ does not match a build of native/, update it from this run's artifact:"
     echo "  gh run download ${GITHUB_RUN_ID:-<run-id>} --repo ${GITHUB_REPOSITORY:-composer/zstd} --name zstd-extract-binaries --dir bin/"
-    echo "  chmod +x bin/zstd-extract-* && git add --chmod=+x bin/"
+    echo "  git add bin/ && git update-index --chmod=+x \$(git ls-files 'bin/zstd-extract-*' | grep -v json)"
     exit 1
 fi
 echo "bin/ is identical to the fresh build"

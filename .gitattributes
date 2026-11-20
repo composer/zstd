@@ -9,6 +9,7 @@
 
 # Native binaries and compressed fixtures
 /bin/zstd-extract-* binary
+/bin/*.cdx.json text eol=lf diff merge
 *.zst binary
 *.tar binary
 

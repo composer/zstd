@@ -9,3 +9,5 @@ cd /d "%~dp0"
 if not exist build mkdir build
 cl /nologo /O2 /MT /W3 /GS /guard:cf /utf-8 /Brepro /Izstd /DZSTD_LEGACY_SUPPORT=0 /DZSTD_MULTITHREAD=0 /DXXH_NAMESPACE=ZSTD_ /DZSTD_NO_TRACE /DDEBUGLEVEL=0 /DZSTD_DISABLE_ASM /D_CRT_SECURE_NO_WARNINGS src\main.c zstd\common\*.c zstd\decompress\*.c /Fobuild\ /Fe:build\zstd-extract-windows-x86_64.exe /link /RELEASE /Brepro /DYNAMICBASE /HIGHENTROPYVA /NXCOMPAT /guard:cf || exit /b 1
 del build\*.obj
+rem the versions that end up in the SBOM
+(echo msvc=%VCToolsVersion%& echo ucrt=%UCRTVersion%& echo sdk=%WindowsSDKVersion%)> build\zstd-extract-windows-x86_64.exe.toolchain

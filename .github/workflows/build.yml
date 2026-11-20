@@ -1,7 +1,7 @@
 name: "Build native binaries"
 
 # Reusable: builds the zstd-extract binaries on each platform's native toolchain, twice to make sure the build is
-# deterministic, and uploads them with their checksums as the "zstd-extract-binaries" artifact.
+# deterministic, and uploads them with their SBOMs and checksums as the "zstd-extract-binaries" artifact.
 
 on:
   workflow_call:
@@ -53,7 +53,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: linux-${{ matrix.arch }}
-          path: native/build/zstd-extract-linux-${{ matrix.arch }}
+          path: native/build/zstd-extract-linux-${{ matrix.arch }}*
           if-no-files-found: error
 
   darwin:
@@ -80,7 +80,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: darwin
-          path: native/build/zstd-extract-darwin
+          path: native/build/zstd-extract-darwin*
           if-no-files-found: error
 
   windows:
@@ -112,7 +112,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-x86_64
-          path: native/build/zstd-extract-windows-x86_64.exe
+          path: native/build/zstd-extract-windows-x86_64.exe*
           if-no-files-found: error
 
   collect:
@@ -120,19 +120,26 @@ jobs:
     needs: [linux, darwin, windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          path: bin
+          path: ${{ runner.temp }}/bin
           pattern: '{linux-*,darwin,windows-*}'
           merge-multiple: true
 
-      - name: Checksums
+      - name: SBOMs and checksums
         run: |
-          chmod +x bin/zstd-extract-*
-          cd bin && LC_ALL=C sha256sum zstd-extract-* | tee SHA256SUMS
+          .github/scripts/sbom.sh "$RUNNER_TEMP/bin"
+          cd "$RUNNER_TEMP/bin"
+          chmod +x zstd-extract-*
+          chmod -x ./*.cdx.json
+          LC_ALL=C sha256sum zstd-extract-* | tee SHA256SUMS
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: zstd-extract-binaries
-          path: bin/
+          path: ${{ runner.temp }}/bin/
           if-no-files-found: error

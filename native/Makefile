@@ -2,6 +2,7 @@
 #   make linux    -> build/zstd-extract-linux-$(uname -m), statically linked against the system's libc;
 #                    released binaries use musl instead, built with build-linux.sh
 #   make darwin   -> build/zstd-extract-darwin, universal x86_64 + arm64, ad-hoc signed
+# The release builds also write <binary>.toolchain, the versions the SBOM is generated from (.github/scripts/sbom.sh).
 # Windows is built with build-windows.cmd (MSVC).
 
 ZSTD_SRC := $(wildcard zstd/common/*.c) $(wildcard zstd/decompress/*.c)
@@ -11,6 +12,10 @@ CFLAGS += -std=c99 -Wall -Wextra -Izstd -DZSTD_LEGACY_SUPPORT=0 -DZSTD_MULTITHRE
 	-DZSTD_NO_TRACE -DDEBUGLEVEL=0 -ffunction-sections -fdata-sections
 # the binary parses untrusted archives: keep exploit mitigations on whatever the compiler defaults are
 CFLAGS += -fstack-protector-strong -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=2 -fPIE
+# statically linked libc, shown by --version
+ifdef LIBC
+CFLAGS += -DEXTRACT_LIBC='"$(LIBC)"'
+endif
 ARCH := $(shell uname -m | sed 's/arm64/aarch64/')
 
 .PHONY: linux darwin clean
@@ -28,6 +33,7 @@ build/zstd-extract-darwin: $(SRC)
 	$(CC) $(CFLAGS) -arch x86_64 -arch arm64 -mmacosx-version-min=11.0 -Wl,-dead_strip -o $@ $(SRC) zstd/decompress/huf_decompress_amd64.S
 	strip -x $@
 	codesign --force --sign - $@
+	{ echo "clang=$$($(CC) --version | sed -n "1s/.*version //p")"; echo "sdk=$$(xcrun --show-sdk-version)"; } > $@.toolchain
 
 clean:
 	rm -rf build

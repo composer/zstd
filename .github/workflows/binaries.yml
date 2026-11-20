@@ -10,14 +10,14 @@ on:
       - 'native/**'
       - '.github/workflows/binaries.yml'
       - '.github/workflows/build.yml'
-      - '.github/scripts/compare-binaries.sh'
+      - '.github/scripts/*.sh'
   pull_request:
     paths:
       - 'bin/**'
       - 'native/**'
       - '.github/workflows/binaries.yml'
       - '.github/workflows/build.yml'
-      - '.github/scripts/compare-binaries.sh'
+      - '.github/scripts/*.sh'
   workflow_dispatch:
 
 permissions:

@@ -797,7 +797,14 @@ int main(int argc, char **argv)
 #  endif
 #endif
     if (argc == 2 && !strcmp(argv[1], "--version")) {
+#if defined(EXTRACT_LIBC)
+        printf("zstd-extract %s (zstd %s, %s)\n", EXTRACT_VERSION, ZSTD_versionString(), EXTRACT_LIBC);
+#elif defined(_MSC_FULL_VER)
+        printf("zstd-extract %s (zstd %s, msvc %d.%02d.%d)\n", EXTRACT_VERSION, ZSTD_versionString(), _MSC_VER / 100,
+            _MSC_VER % 100, _MSC_FULL_VER % 100000);
+#else
         printf("zstd-extract %s (zstd %s)\n", EXTRACT_VERSION, ZSTD_versionString());
+#endif
         return EXIT_OK;
     }
     if (argc == 4 && !strncmp(argv[1], "--max-size=", 11)) {
