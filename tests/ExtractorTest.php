@@ -84,6 +84,7 @@ class ExtractorTest extends TestCase
      */
     public function testLongNames(string $method): void
     {
+        self::requireLongPaths();
         $long = str_repeat('d', 120).'/'.str_repeat('f', 150);
         $tar = (new TarBuilder())
             ->gnuLong('gnu/'.$long, '0', 'gnu')
@@ -238,6 +239,7 @@ class ExtractorTest extends TestCase
      */
     public function testAllMethodsProduceIdenticalTrees(): void
     {
+        self::requireLongPaths();
         $fixtures = self::glob(__DIR__.'/Fixtures/*.tar.zst');
         self::assertNotEmpty($fixtures);
         $reference = null;

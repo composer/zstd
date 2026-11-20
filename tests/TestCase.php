@@ -160,6 +160,14 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
         return $process;
     }
 
+    protected static function requireLongPaths(): void
+    {
+        // PHP 7 cannot create or remove paths beyond MAX_PATH on Windows
+        if (Filesystem::isWindows() && \PHP_VERSION_ID < 80000) {
+            self::markTestSkipped('Long paths need PHP 8+ on Windows');
+        }
+    }
+
     /**
      * @return list<string>
      */

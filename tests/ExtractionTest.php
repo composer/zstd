@@ -25,6 +25,7 @@ class ExtractionTest extends TestCase
      */
     public function testCommandsAndResults(string $method): void
     {
+        self::requireLongPaths();
         $fixtures = self::glob(__DIR__.'/Fixtures/*.tar.zst');
         $reference = null;
         foreach ($fixtures as $fixture) {
@@ -43,6 +44,7 @@ class ExtractionTest extends TestCase
 
     public function testParallelExtraction(): void
     {
+        self::requireLongPaths();
         $method = \in_array(Extractor::METHOD_BUNDLED, self::availableMethods(), true) ? Extractor::METHOD_BUNDLED : null;
         if ($method === null) {
             self::markTestSkipped('No bundled binary available');

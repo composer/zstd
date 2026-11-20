@@ -12,6 +12,7 @@
 namespace Composer\Zstd\Tests;
 
 use Composer\Zstd\ExtractionException;
+use Composer\Zstd\Filesystem;
 use Composer\Zstd\TarExtractor;
 
 /**
@@ -58,6 +59,9 @@ class TarExtractorTest extends TestCase
 
     public function testWindowsNamesAreFineElsewhere(): void
     {
+        if (Filesystem::isWindows()) {
+            self::markTestSkipped('a:b would be an alternate data stream');
+        }
         mkdir($this->tmp.'/dest');
         (new TarExtractor(false))->extract((new TarBuilder())->file('aux.php', 'x')->file('a:b', 'y')->build(), $this->tmp.'/dest');
         self::assertSame(['a:b' => 'file:y', 'aux.php' => 'file:x'], self::tree($this->tmp.'/dest'));
