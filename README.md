@@ -241,8 +241,9 @@ Tar safety rules
 - Symlink targets must be relative and contain no backslashes or control characters. Symlinks are created after
   all files and directories, so nothing is ever written through one. Once all of them exist, each one is resolved
   on the real filesystem, following other links like the OS would. If any step leaves the destination, or there
-  are more than 40 hops, all symlinks are removed and extraction fails. Targets that don't exist yet are resolved
-  lexically.
+  are more than 40 hops, all symlinks are removed and extraction fails. The same happens when verifying all
+  symlinks takes more than a million path components, which no real archive comes close to. Targets that don't
+  exist yet are resolved lexically.
 - File modes are `0666` or `0777` (if any execute bit is set) minus the umask. Owners and timestamps are not
   restored.
 

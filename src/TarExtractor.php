@@ -23,6 +23,8 @@ final class TarExtractor
     private const MAX_META = 1 << 20;
     private const MAX_REL = 4096;
     private const MAX_LINK_HOPS = 40;
+    /** path components walked to verify all symlinks */
+    private const MAX_LINK_STEPS = 1000000;
     private const MAX_MSG_NAME = 200;
 
     /** @var bool */
@@ -35,6 +37,8 @@ final class TarExtractor
     private $links = [];
     /** @var list<string> */
     private $createdLinks = [];
+    /** @var int */
+    private $linkSteps = 0;
 
     /**
      * @param bool|null $windows apply Windows rules, defaults to the current platform
@@ -56,6 +60,7 @@ final class TarExtractor
         $this->lastParent = null;
         $this->links = [];
         $this->createdLinks = [];
+        $this->linkSteps = 0;
 
         $len = \strlen($tar);
         $pos = 0;
@@ -160,6 +165,9 @@ final class TarExtractor
             foreach ($this->links as [$rel, $target]) {
                 if (!$this->linkStaysInside($rel, $target)) {
                     $this->removeLinks();
+                    if ($this->linkSteps > self::MAX_LINK_STEPS) {
+                        throw new ExtractionException('Symlinks take too many steps to verify');
+                    }
                     throw new ExtractionException(sprintf('Unsafe symlink "%s" -> "%s": resolves outside of the destination', $rel, $target));
                 }
             }
@@ -421,12 +429,17 @@ final class TarExtractor
     {
         $slash = strrpos($rel, '/');
         $cur = $slash === false ? [] : explode('/', substr($rel, 0, $slash));
-        $rem = explode('/', $target);
+        // reversed, so components are taken from the end: array_shift() would make long targets quadratic
+        $rem = array_reverse(explode('/', $target));
         $hops = 0;
         while ($rem !== []) {
-            $c = array_shift($rem);
+            $c = array_pop($rem);
             if ($c === '' || $c === '.') {
                 continue;
+            }
+            // long targets chained through many links would otherwise take hours
+            if (++$this->linkSteps > self::MAX_LINK_STEPS) {
+                return false;
             }
             if ($c === '..') {
                 if ($cur === []) {
@@ -448,7 +461,9 @@ final class TarExtractor
                     return false;
                 }
                 array_pop($cur);
-                $rem = array_merge(explode('/', $t), $rem);
+                foreach (array_reverse(explode('/', $t)) as $part) {
+                    $rem[] = $part;
+                }
             }
         }
 

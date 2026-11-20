@@ -45,6 +45,7 @@
 #define MAX_REL 4096
 #define MAX_META (1 << 20)
 #define MAX_LINK_HOPS 40
+#define MAX_LINK_STEPS 1000000 /* path components walked to verify all symlinks */
 #define MAX_MSG_NAME 200
 
 enum { EXIT_OK = 0, EXIT_INVALID = 1, EXIT_USAGE = 2, EXIT_IO = 3 };
@@ -479,7 +480,7 @@ typedef struct {
 } link_t;
 
 static link_t *g_links;
-static size_t g_linkCount, g_linkCap;
+static size_t g_linkCount, g_linkCap, g_linkSteps;
 
 static void write_file(reader_t *r, const char *rel, uint64_t size, int exec)
 {
@@ -539,6 +540,8 @@ static int link_stays_inside(const link_t *l)
         size_t n = (size_t)(p - s);
         if (*p == '/') p++;
         if (n == 0 || (n == 1 && s[0] == '.')) continue;
+        /* long targets chained through many links would otherwise take hours */
+        if (++g_linkSteps > MAX_LINK_STEPS) { ok = 0; break; }
         if (n == 2 && s[0] == '.' && s[1] == '.') {
             if (!cur[0]) { ok = 0; break; }
             pop_component(cur);
@@ -733,6 +736,7 @@ static void extract(FILE *f)
     for (size_t i = 0; i < g_linkCount; i++) {
         if (!link_stays_inside(&g_links[i])) {
             remove_links();
+            if (g_linkSteps > MAX_LINK_STEPS) fail(EXIT_INVALID, "symlinks take too many steps to verify");
             fail(EXIT_INVALID, "unsafe symlink \"%s\" -> \"%s\": resolves outside of the destination", g_links[i].rel, g_links[i].target);
         }
     }
