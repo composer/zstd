@@ -134,13 +134,14 @@ class BadActorTest extends TestCase
     }
 
     /**
-     * Symlinks with 401 component targets (macOS caps targets at 1023 bytes), enough to walk over a million components.
+     * Symlinks with 201 component targets, enough to walk over a million components. PHP on macOS only accepts
+     * targets that fit in 1024 bytes together with the destination path.
      */
     private static function symlinkMaze(): TarBuilder
     {
         $tar = (new TarBuilder())->dir('d');
-        $target = str_repeat('d/../', 200).'d';
-        for ($i = 0; $i < 2600; $i++) {
+        $target = str_repeat('d/../', 100).'d';
+        for ($i = 0; $i < 5200; $i++) {
             $tar->gnuLong('l'.$i, '2', '', $target);
         }
 
