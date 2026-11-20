@@ -1,0 +1,94 @@
+name: "Builder image"
+
+# Builds the Linux toolchain image from native/Dockerfile and publishes it as ghcr.io/composer/zstd-builder.
+# native/build-linux.sh pins the image by digest, so a toolchain update is an explicit commit: run this workflow,
+# put the digest it prints into build-linux.sh, and refresh bin/. Pull requests only check that the image builds.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'native/Dockerfile'
+      - '.github/workflows/builder.yml'
+  pull_request:
+    paths:
+      - 'native/Dockerfile'
+      - '.github/workflows/builder.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}-builder
+  TAG: r${{ github.run_number }}.${{ github.run_attempt }}
+
+jobs:
+  build:
+    name: "Build ${{ matrix.arch }}"
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      packages: write # to push the image
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: |
+          # no build context, and no attestation manifests: the index job needs plain per-architecture images
+          docker buildx build --provenance=false --sbom=false --load -t "$IMAGE:$TAG-$ARCH" - < native/Dockerfile
+          docker run --rm "$IMAGE:$TAG-$ARCH" apk info -v | sort
+
+      - name: Push
+        if: github.event_name != 'pull_request'
+        env:
+          ARCH: ${{ matrix.arch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:$TAG-$ARCH"
+
+  index:
+    name: "Publish"
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write # to push the multi-arch index
+      id-token: write # to sign the attestation with the workflow's OIDC identity
+      attestations: write # to store the attestation
+    steps:
+      - name: Create the multi-arch index
+        id: index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker buildx imagetools create -t "$IMAGE:$TAG" "$IMAGE:$TAG-amd64" "$IMAGE:$TAG-arm64"
+          digest=$(docker buildx imagetools inspect "$IMAGE:$TAG" --format '{{json .Manifest}}' | jq -r .digest)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "IMAGE=$IMAGE@$digest" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.index.outputs.digest }}
+          push-to-registry: true

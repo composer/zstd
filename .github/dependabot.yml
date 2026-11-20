@@ -8,3 +8,9 @@ updates:
     cooldown:
       default-days: 7
 
+  - package-ecosystem: "docker"
+    directory: "/native"
+    schedule:
+      interval: "monthly"
+    cooldown:
+      default-days: 7
