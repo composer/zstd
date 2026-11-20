@@ -1,15 +1,14 @@
 #!/bin/sh
 # Builds build/zstd-extract-linux-<arch> for the current architecture, statically linked against musl (MIT
-# licensed, unlike glibc's LGPL), in a pinned Alpine container. This is how the released binaries are built.
+# licensed, unlike glibc's LGPL), in a pinned toolchain container. This is how the released binaries are built.
 set -eu
 
-# alpine:3.23, multi-arch index
-IMAGE=alpine:3.23@sha256:ff7f0c727dd796aa36787bfcd9a64bf35a6ce72a73451b3359fde849b6703d63
+# built from Dockerfile by the builder workflow, which prints the digest to put here
+IMAGE=ghcr.io/composer/zstd-builder@sha256:c3d79cc03d7f87bdc162957ed70dbac075b59ba87be8d091f09cc85296d5cd9d
 
 cd "$(dirname "$0")"
 mkdir -p build
-docker run --rm -v "$PWD:/src:ro" -v "$PWD/build:/out" -e OWNER="$(id -u):$(id -g)" "$IMAGE" sh -euc '
-    apk add -q gcc musl-dev make fortify-headers # musl needs these for _FORTIFY_SOURCE to do anything
+docker run --rm --network none -v "$PWD:/src:ro" -v "$PWD/build:/out" -e OWNER="$(id -u):$(id -g)" "$IMAGE" sh -euc '
     cp -r /src /tmp/native
     rm -rf /tmp/native/build
     make -s -C /tmp/native linux

@@ -182,8 +182,8 @@ Bundled binaries
 | `zstd-extract-windows-x86_64.exe` | Windows x64, and Windows 11 arm64 through emulation |
 
 They are built from `native/` (a small C program plus the vendored zstd decoder) on GitHub Actions. On Linux, gcc
-links them statically against musl (static-pie, RELRO, stack protector, `_FORTIFY_SOURCE`), inside a pinned Alpine
-container (`native/build-linux.sh`). macOS uses Apple clang, and links the system library dynamically as macOS has
+links them statically against musl (static-pie, RELRO, stack protector, `_FORTIFY_SOURCE`), inside a toolchain
+container pinned by digest (`native/build-linux.sh`). macOS uses Apple clang, and links the system library dynamically as macOS has
 no static libc. Windows uses MSVC with a static C runtime (`/GS`, Control Flow Guard, ASLR). Where no binary runs,
 e.g. Windows 10 on arm64 or other architectures, the next method is used. musl is
 used instead of glibc because it is MIT licensed, where a statically linked glibc would bring LGPL obligations. It
@@ -202,8 +202,10 @@ As the files are identical, that attestation covers the committed copies as well
 gh attestation verify bin/zstd-extract-linux-x86_64 --repo composer/zstd
 ```
 
-The toolchains come from the runner images, so a build is only reproducible until GitHub updates them. Older
-releases cannot be rebuilt identically later on, but their attestations stay valid.
+The Linux toolchain is the `ghcr.io/composer/zstd-builder` image, built from `native/Dockerfile` and pinned by
+digest, so any release's Linux binaries can be rebuilt identically. The macOS and Windows toolchains come from the
+runner images, so those builds are only reproducible until GitHub updates them. Older releases cannot be rebuilt
+identically for these two later on, but their attestations stay valid.
 
 ### Running the binary safely
 
@@ -287,13 +289,17 @@ Tests run against every method available locally:
 3. Commit them, executable and with `bin/SHA256SUMS`: `chmod +x bin/zstd-extract-* && git add --chmod=+x bin/`.
    The next run must then find them identical.
 
-The same applies when GitHub updates a runner image and the toolchain output changes: CI shows it, and the
-binaries are refreshed the same way.
+The same applies when GitHub updates a macOS or Windows runner image and the toolchain output changes: CI shows
+it, and the binaries are refreshed the same way.
+
+The Linux toolchain only changes on purpose. To update it (new gcc or musl packages, or a new Alpine release in
+`native/Dockerfile`), run the [builder](.github/workflows/builder.yml) workflow, put the image digest it prints
+into `native/build-linux.sh`, and refresh the binaries as above.
 
 ### Releases
 
-Publish the GitHub release soon after the last CI run on the tagged commit, before a runner image update can change
-the toolchains. The release workflow rebuilds, compares, attests, and uploads the binaries, `SHA256SUMS` and
+Publish the GitHub release soon after the last CI run on the tagged commit, before a macOS or Windows runner image update
+can change the toolchains. The release workflow rebuilds, compares, attests, and uploads the binaries, `SHA256SUMS` and
 license files. If the rebuild differs from `bin/`, it fails before attesting or uploading anything. Refresh the
 binaries as above and tag again.
 

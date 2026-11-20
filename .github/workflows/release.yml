@@ -4,7 +4,7 @@ name: "Release binaries"
 # the build (so the provenance covers the build steps of this run) and attaches the files to the release.
 # As the files are identical, the attestation covers bin/ in the tagged commit as well:
 #   gh attestation verify bin/zstd-extract-linux-x86_64 --repo composer/zstd
-# Release soon after merging: runner image updates can change the toolchains, and with them the binaries.
+# Release soon after merging: macOS and Windows runner image updates can change the toolchains, and the binaries.
 
 on:
   release:
