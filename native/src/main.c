@@ -24,6 +24,8 @@
 #else
 #  define _POSIX_C_SOURCE 200809L
 #  define _DEFAULT_SOURCE
+/* _POSIX_C_SOURCE hides O_NOFOLLOW on macOS */
+#  define _DARWIN_C_SOURCE
 #  include <dirent.h>
 #  include <fcntl.h>
 #  include <sys/stat.h>
@@ -479,6 +481,15 @@ typedef struct {
     int created;
 } link_t;
 
+/* after a failed exclusive create: Windows reports EACCES rather than EEXIST for an existing directory */
+static int exists_error(const char *full)
+{
+    int e = errno;
+    int exists = e == EEXIST || ptype(full) != 0;
+    errno = e;
+    return exists;
+}
+
 static link_t *g_links;
 static size_t g_linkCount, g_linkCap, g_linkSteps;
 
@@ -487,7 +498,7 @@ static void write_file(reader_t *r, const char *rel, uint64_t size, int exec)
     make_parents(rel);
     char *full = full_path(rel);
     int fd = do_create(full, exec);
-    if (fd < 0 && errno == EEXIST) {
+    if (fd < 0 && exists_error(full)) {
         /* later duplicates win, but only ever replace a regular file */
         if (ptype(full) != 1) fail(EXIT_INVALID, "%s conflicts with an existing entry", rel);
         if (do_unlink(full) != 0) fail(EXIT_IO, "cannot replace %s: %s", rel, strerror(errno));
@@ -597,7 +608,7 @@ static void create_links(void)
 #if defined(_WIN32)
         /* no symlinks on Windows: store the target as file content, like git with core.symlinks=false */
         int fd = do_create(full, 0);
-        if (fd < 0 && errno == EEXIST) fail(EXIT_INVALID, "%s conflicts with an existing entry", l->rel);
+        if (fd < 0 && exists_error(full)) fail(EXIT_INVALID, "%s conflicts with an existing entry", l->rel);
         if (fd < 0) fail(EXIT_IO, "cannot create %s: %s", l->rel, strerror(errno));
         size_t n = strlen(l->target);
         if (write_fd(fd, l->target, n) != (ssize_t)n || close_fd(fd) != 0) fail(EXIT_IO, "cannot write %s", l->rel);
