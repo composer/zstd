@@ -172,18 +172,20 @@ Neither can limit its output on its own:
 Bundled binaries
 ----------------
 
-`bin/` contains one statically linked `zstd-extract` executable per platform:
+`bin/` contains one self-contained `zstd-extract` executable per platform:
 
 | file | runs on |
 |---|---|
-| `zstd-extract-linux-x86_64` | Linux x86_64, glibc or musl |
-| `zstd-extract-linux-aarch64` | Linux arm64, glibc or musl |
+| `zstd-extract-linux-x86_64` | Linux x86_64, any libc |
+| `zstd-extract-linux-aarch64` | Linux arm64, any libc, 4K to 64K pages |
 | `zstd-extract-darwin` | macOS 11+, universal x86_64 + arm64 |
-| `zstd-extract-windows-x86_64.exe` | Windows x64, and arm64 through emulation |
+| `zstd-extract-windows-x86_64.exe` | Windows x64, and Windows 11 arm64 through emulation |
 
 They are built from `native/` (a small C program plus the vendored zstd decoder) on GitHub Actions. On Linux, gcc
-links them statically against musl (static-pie, RELRO, stack protector), inside a pinned Alpine container
-(`native/build-linux.sh`). macOS uses Apple clang. Windows uses MSVC (`/GS`, Control Flow Guard, ASLR). musl is
+links them statically against musl (static-pie, RELRO, stack protector, `_FORTIFY_SOURCE`), inside a pinned Alpine
+container (`native/build-linux.sh`). macOS uses Apple clang, and links the system library dynamically as macOS has
+no static libc. Windows uses MSVC with a static C runtime (`/GS`, Control Flow Guard, ASLR). Where no binary runs,
+e.g. Windows 10 on arm64 or other architectures, the next method is used. musl is
 used instead of glibc because it is MIT licensed, where a statically linked glibc would bring LGPL obligations. It
 is also as fast and 5x smaller. The builds are reproducible: every build runs twice and fails unless both
 results are identical. Two checks build on that:
