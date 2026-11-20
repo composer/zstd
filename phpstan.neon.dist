@@ -13,6 +13,13 @@ parameters:
             identifier: offsetAccess.nonOffsetAccessible
             message: '#^Cannot access offset (1|int) on array\|false\.$#'
             path: src/ZstdDecoder.php
+        # hash('xxh64') returns false on PHP < 8.1, it is only called once checked to be available
+        -
+            message: '#^Parameter \#1 \$str(ing)? of function substr expects string, false given\.$#'
+            paths:
+                - src/ZstdDecoder.php
+                - tests/TarBuilder.php
+            reportUnmatched: false
 
 includes:
     - vendor/phpstan/phpstan/conf/bleedingEdge.neon

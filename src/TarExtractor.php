@@ -219,12 +219,10 @@ final class TarExtractor
                 throw new ExtractionException('Malformed pax header');
             }
             $kv = substr($d, $pos + \strlen($m[0]), $len - \strlen($m[0]) - 1);
-            $eq = strpos($kv, '=');
-            if ($eq === false) {
+            if (preg_match('{^([^=]*)=(.*)$}sD', $kv, $kvm) !== 1) {
                 throw new ExtractionException('Malformed pax header');
             }
-            $key = substr($kv, 0, $eq);
-            $value = substr($kv, $eq + 1);
+            [, $key, $value] = $kvm;
             if (strpos($value, "\0") !== false) {
                 throw new ExtractionException('NUL byte in pax value');
             }
