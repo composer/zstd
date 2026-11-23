@@ -26,6 +26,8 @@ final class NativeExtractor
     private const EXIT_INVALID = 1;
     private const EXIT_USAGE = 2;
     private const EXIT_IO = 3;
+    /** shell "cannot execute"/"not found", Windows loader errors (DLL not found, bad image, DLL init failed) */
+    private const EXEC_FAILED = [126, 127, 0xC0000135, 0xC000007B, 0xC0000142];
 
     /** @var string|null */
     private $cacheDir;
@@ -146,9 +148,8 @@ final class NativeExtractor
     /**
      * Interprets the exit code of an extraction.
      *
-     * @return bool false if the binary itself could not run (wrong arch, exec denied, crash), the caller should then
-     *              fall back to another method
-     * @throws ExtractionException when the binary rejected the archive or failed to write it
+     * @return bool false if the binary could not be executed, the caller should then fall back to another method
+     * @throws ExtractionException when the binary rejected the archive, failed to write it, or was killed
      */
     public function handleResult(int $code, string $stderr): bool
     {
@@ -160,8 +161,12 @@ final class NativeExtractor
             throw new ExtractionException($message !== '' ? ucfirst($message) : 'zstd-extract failed with exit code '.$code);
         }
 
-        // anything else means the binary itself could not run (wrong arch, exec denied, crash)
-        return $this->unavailable(sprintf('%s exited with code %d: %s', (string) $this->command, $code, $message));
+        if (\in_array($code, self::EXEC_FAILED, true)) {
+            return $this->unavailable(sprintf('%s exited with code %d: %s', (string) $this->command, $code, $message));
+        }
+
+        // killed (e.g. by a runner's timeout) or crashed: --version ran fine, so this is about this archive
+        throw new ExtractionException(sprintf('zstd-extract exited with code %d%s', $code, $message !== '' ? ': '.$message : ''));
     }
 
     /**
@@ -190,8 +195,18 @@ final class NativeExtractor
         }
         $output = (string) stream_get_contents($pipes[$capture]);
         fclose($pipes[$capture]);
+        // proc_close() reports a killed child as the bare signal number, which would read as one of our exit codes
+        $status = proc_get_status($process);
+        while ($status['running']) {
+            usleep(1000);
+            $status = proc_get_status($process);
+        }
+        $code = proc_close($process);
+        if ($status['signaled']) {
+            return [128 + $status['termsig'], $output];
+        }
 
-        return [proc_close($process), $output];
+        return [$status['exitcode'] !== -1 ? $status['exitcode'] : $code, $output];
     }
 
     /**

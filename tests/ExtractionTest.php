@@ -88,6 +88,26 @@ class ExtractionTest extends TestCase
     }
 
     /**
+     * A killed binary (e.g. by the runner's timeout) fails the extraction, the binary stays in use for the next ones.
+     */
+    public function testCompleteFailsWhenTheBinaryWasKilled(): void
+    {
+        $binary = self::bundledBinary();
+        if ($binary === null) {
+            self::markTestSkipped('No bundled binary available');
+        }
+        $extractor = new Extractor($this->tmp.'/cache', [Extractor::METHOD_BUNDLED, Extractor::METHOD_PHP], $binary);
+        $extraction = $extractor->prepare($this->writeArchive((new TarBuilder())->file('a', 'x')->zst()), $this->tmp.'/dest');
+        try {
+            $extraction->complete(143, '', '');
+            self::fail('Expected an exception');
+        } catch (ExtractionException $e) {
+            self::assertSame('zstd-extract exited with code 143', $e->getMessage());
+        }
+        self::assertArrayNotHasKey(Extractor::METHOD_BUNDLED, $extractor->getUnavailableReasons());
+    }
+
+    /**
      * @dataProvider provideMethods
      */
     public function testRejectionCleansUp(string $method): void

@@ -11,6 +11,7 @@
 
 namespace Composer\Zstd\Tests;
 
+use Composer\Zstd\ExtractionException;
 use Composer\Zstd\Extractor;
 use Composer\Zstd\Filesystem;
 use Composer\Zstd\NativeExtractor;
@@ -52,6 +53,26 @@ class NativeExtractorTest extends TestCase
         $extractor->extract($this->archive(), $this->tmp.'/dest');
         self::assertSame('php', $extractor->getLastMethod());
         self::assertSame(['a' => 'file:hello'], self::tree($this->tmp.'/dest'));
+    }
+
+    /**
+     * proc_close() gives the bare signal number for a killed child, SIGHUP must not read as exit code 1.
+     */
+    public function testKilledBinaryIsNotMistakenForARejection(): void
+    {
+        if (Filesystem::isWindows()) {
+            self::markTestSkipped('POSIX only');
+        }
+        file_put_contents($this->tmp.'/killed', "#!/bin/sh\n[ \"\$1\" = --version ] && echo 'zstd-extract 0' && exit 0\nkill -HUP \$\$\n");
+        chmod($this->tmp.'/killed', 0755);
+        $extractor = new Extractor(null, [Extractor::METHOD_BUNDLED, Extractor::METHOD_PHP], $this->tmp.'/killed');
+        try {
+            $extractor->extract($this->archive(), $this->tmp.'/dest');
+            self::fail('Expected an exception');
+        } catch (ExtractionException $e) {
+            self::assertSame('zstd-extract exited with code 129', $e->getMessage());
+        }
+        self::assertArrayNotHasKey(Extractor::METHOD_BUNDLED, $extractor->getUnavailableReasons());
     }
 
     public function testRunsInPlace(): void
