@@ -42,6 +42,9 @@ class BadActorTest extends TestCase
             'nul in pax path' => [(new TarBuilder())->pax(['path' => "a\0b"], 'x'), '{NUL byte}'],
             'empty name' => [(new TarBuilder())->file('', 'x'), '{empty path}'],
             'only dots' => [(new TarBuilder())->file('./.', 'x'), '{empty path}'],
+            'path too long' => [(new TarBuilder())->pax(['path' => str_repeat('a', 4096)], 'x'), '{path too long}'],
+            'too many path components' => [(new TarBuilder())->pax(['path' => str_repeat('a/', 128).'f'], 'x'), '{too many path components}'],
+            'too many path components in dir entry' => [(new TarBuilder())->pax(['path' => str_repeat('d/', 129)], 'x', '5'), '{too many path components}'],
             // error messages must stay short (a full stderr pipe would hang the binary) and free of control characters
             'huge unsafe name' => [(new TarBuilder())->gnuLong('../'.str_repeat('A', 200000), '0', 'x'), '{^Unsafe entry "\.\./A{197}\.\.\.": parent directory reference$}'],
             'escape sequence in name' => [(new TarBuilder())->pax(['path' => "../\e[2J"], 'x'), '{^Unsafe entry "\.\./\?\[2J"}'],

@@ -10,6 +10,7 @@
 // unsafe code only in the FFI modules
 #![deny(unsafe_code)]
 
+use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
@@ -24,6 +25,8 @@ mod zstd;
 const EXTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
 const WINDOW_LOG_MAX: i32 = 27;
 const MAX_REL: usize = 4096;
+/* every component costs a lookup in each filesystem call on the path */
+const MAX_DEPTH: usize = 128;
 const MAX_META: u64 = 1 << 20;
 #[cfg(unix)]
 const MAX_LINK_HOPS: u32 = 40;
@@ -220,6 +223,9 @@ impl Reader {
 struct Ctx {
     dest: Vec<u8>,
     last_parent: Option<Vec<u8>>,
+    /// directories verified so far, keyed by parent id + name, so each one is checked once however
+    /// entries alternate between deep parents; nothing removes a directory until the links are created
+    dirs: HashMap<Vec<u8>, u32>,
     links: Vec<Link>,
     #[cfg_attr(windows, allow(dead_code))]
     link_steps: u64,
@@ -249,11 +255,21 @@ impl Ctx {
         if self.last_parent.as_deref() == Some(parent) {
             return;
         }
+        let mut id = 0u32; // the destination
+        let mut key = Vec::new();
         for i in 0..=parent.len() {
             if i < parent.len() && parent[i] != b'/' {
                 continue;
             }
             let sub = &parent[..i];
+            let name = &sub[sub.iter().rposition(|&c| c == b'/').map_or(0, |s| s + 1)..];
+            key.clear();
+            key.extend_from_slice(&id.to_le_bytes());
+            key.extend_from_slice(name);
+            if let Some(&known) = self.dirs.get(&key[..]) {
+                id = known;
+                continue;
+            }
             let full = self.full_path(sub);
             let mut t = ptype(&full);
             if t == PType::Missing {
@@ -273,6 +289,8 @@ impl Ctx {
                     format!("{} exists and is not a directory", lossy(sub)),
                 );
             }
+            id = self.dirs.len() as u32 + 1;
+            self.dirs.insert(key.clone(), id);
         }
         self.last_parent = Some(parent.to_vec());
     }
@@ -383,6 +401,7 @@ impl Ctx {
     fn create_links(&mut self) {
         /* links now appear on disk, so every parent must be checked again */
         self.last_parent = None;
+        self.dirs.clear();
         for i in 0..self.links.len() {
             let rel = self.links[i].rel.clone();
             self.make_parents(&rel);
@@ -560,6 +579,9 @@ fn normalize_entry(name: &[u8]) -> Result<Vec<u8>, &'static str> {
     }
     if out.len() >= MAX_REL {
         return Err("path too long");
+    }
+    if out.split(|&c| c == b'/').count() > MAX_DEPTH {
+        return Err("too many path components");
     }
     Ok(out)
 }
@@ -898,6 +920,7 @@ fn main() {
     let mut ctx = Ctx {
         dest,
         last_parent: None,
+        dirs: HashMap::new(),
         links: Vec::new(),
         link_steps: 0,
     };

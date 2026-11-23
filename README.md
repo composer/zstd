@@ -251,7 +251,7 @@ Tar safety rules
   that point. The other methods hold the decompressed data in memory, so PHP's `memory_limit` can end the
   extraction earlier.
 - Entry names may not be absolute or contain `..` components, backslashes or control characters. `.` and empty
-  components are dropped. On Windows, `<>:"|?*`, trailing dots or spaces and reserved device names
+  components are dropped. Names must be shorter than 4096 bytes and have at most 128 components. On Windows, `<>:"|?*`, trailing dots or spaces and reserved device names
   (`CON`, `NUL`, `COM1`…) are also rejected.
 - Files are created exclusively (`O_EXCL`, which never follows a symlink). When a name appears twice the last
   entry wins, but only a regular file is ever replaced. Directories are only traversed when they are real

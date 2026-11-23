@@ -22,6 +22,8 @@ final class TarExtractor
 {
     private const MAX_META = 1 << 20;
     private const MAX_REL = 4096;
+    /** every component costs a lookup in each filesystem call on the path */
+    private const MAX_DEPTH = 128;
     private const MAX_LINK_HOPS = 40;
     /** path components walked to verify all symlinks */
     private const MAX_LINK_STEPS = 1000000;
@@ -33,6 +35,16 @@ final class TarExtractor
     private $dest = '';
     /** @var string|null parent of the previous entry, already verified */
     private $lastParent;
+    /**
+     * Directories verified so far, keyed by parent id + name, so each one is checked once however entries
+     * alternate between deep parents; nothing removes a directory until the links are created. The keys are
+     * hashed with a secret, as PHP's array hashing is not randomized and names come from the archive.
+     *
+     * @var array<string, int>
+     */
+    private $dirs = [];
+    /** @var string */
+    private $dirsKey = '';
     /** @var list<array{string, string}> [path, target] */
     private $links = [];
     /** @var list<string> */
@@ -58,6 +70,8 @@ final class TarExtractor
             $this->dest = '/';
         }
         $this->lastParent = null;
+        $this->dirs = [];
+        $this->dirsKey = random_bytes(16);
         $this->links = [];
         $this->createdLinks = [];
         $this->linkSteps = 0;
@@ -288,6 +302,11 @@ final class TarExtractor
 
             return null;
         }
+        if (\count($out) > self::MAX_DEPTH) {
+            $why = 'too many path components';
+
+            return null;
+        }
 
         return $rel;
     }
@@ -339,8 +358,14 @@ final class TarExtractor
             return;
         }
         $prefix = '';
+        $id = 0; // the destination
         foreach (explode('/', $parent) as $c) {
             $prefix = $prefix === '' ? $c : $prefix.'/'.$c;
+            $key = md5($this->dirsKey.$id.'/'.$c, true);
+            if (isset($this->dirs[$key])) {
+                $id = $this->dirs[$key];
+                continue;
+            }
             $full = $this->dest.'/'.$prefix;
             $t = self::type($full);
             if ($t === 0) {
@@ -352,6 +377,8 @@ final class TarExtractor
             if ($t !== 2) {
                 throw new ExtractionException(sprintf('%s exists and is not a directory', $prefix));
             }
+            $id = \count($this->dirs) + 1;
+            $this->dirs[$key] = $id;
         }
         $this->lastParent = $parent;
     }
@@ -388,6 +415,7 @@ final class TarExtractor
     {
         // links now appear on disk, so every parent must be checked again
         $this->lastParent = null;
+        $this->dirs = [];
         foreach ($this->links as [$rel, $target]) {
             $this->makeParents($rel);
             $full = $this->dest.'/'.$rel;

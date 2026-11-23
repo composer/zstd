@@ -90,7 +90,8 @@ class ExtractorTest extends TestCase
             ->gnuLong('gnu/'.$long, '0', 'gnu')
             ->pax(['path' => 'pax/'.$long, 'mtime' => '0'], 'ignored', '0', 'pax')
             ->entry('file', '0', 'ustar', 0644, '', 'prefix/dir')
-            ->gnuLong('link-'.str_repeat('l', 120), '2', '', 'gnu/'.$long);
+            ->gnuLong('link-'.str_repeat('l', 120), '2', '', 'gnu/'.$long)
+            ->pax(['path' => str_repeat('n/', 127).'deep'], 'x', '0', 'deep'); // the most components allowed
 
         $tree = $this->extract($method, $tar->zst());
         self::assertSame('file:gnu', $tree['gnu/'.$long]);
@@ -98,6 +99,7 @@ class ExtractorTest extends TestCase
         self::assertSame('file:ustar', $tree['prefix/dir/file']);
         self::assertSame(self::link('gnu/'.$long), $tree['link-'.str_repeat('l', 120)]);
         self::assertArrayNotHasKey('ignored', $tree);
+        self::assertSame('file:deep', $tree[str_repeat('n/', 127).'deep']);
     }
 
     /**
