@@ -83,6 +83,7 @@ class BadActorTest extends TestCase
                 'symlink loop' => [(new TarBuilder())->symlink('a', 'b')->symlink('b', 'a'), '{resolves outside}'],
                 'symlink self loop' => [(new TarBuilder())->symlink('a', 'a'), '{resolves outside}'],
                 'symlinks too expensive to verify' => [self::symlinkMaze(), '{^Symlinks take too many steps to verify$}'],
+                'symlinks of dot components too expensive to verify' => [self::dotMaze(), '{^Symlinks take too many steps to verify$}'],
             ];
         }
 
@@ -146,6 +147,20 @@ class BadActorTest extends TestCase
         $tar = (new TarBuilder())->dir('d');
         $target = str_repeat('d/../', 100).'d';
         for ($i = 0; $i < 5200; $i++) {
+            $tar->gnuLong('l'.$i, '2', '', $target);
+        }
+
+        return $tar;
+    }
+
+    /**
+     * Symlinks with 451 component targets that are nearly all ".", which are as costly to walk.
+     */
+    private static function dotMaze(): TarBuilder
+    {
+        $tar = new TarBuilder();
+        $target = str_repeat('./', 450).'x';
+        for ($i = 0; $i < 2300; $i++) {
             $tar->gnuLong('l'.$i, '2', '', $target);
         }
 

@@ -460,12 +460,12 @@ final class TarExtractor
         $hops = 0;
         while ($rem !== []) {
             $c = array_pop($rem);
-            if ($c === '' || $c === '.') {
-                continue;
-            }
-            // long targets chained through many links would otherwise take hours
+            // long targets chained through many links would otherwise take hours, "a//././b" included
             if (++$this->linkSteps > self::MAX_LINK_STEPS) {
                 return false;
+            }
+            if ($c === '' || $c === '.') {
+                continue;
             }
             if ($c === '..') {
                 if ($cur === []) {

@@ -366,12 +366,13 @@ impl Ctx {
             if p < rem.len() {
                 p += 1;
             }
-            if comp.is_empty() || comp == b"." {
-                continue;
-            }
+            /* "a//././b" counts too */
             self.link_steps += 1;
             if self.link_steps > MAX_LINK_STEPS {
                 return false;
+            }
+            if comp.is_empty() || comp == b"." {
+                continue;
             }
             if comp == b".." {
                 if cur.is_empty() {
