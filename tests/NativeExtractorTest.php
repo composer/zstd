@@ -76,6 +76,61 @@ class NativeExtractorTest extends TestCase
         self::assertArrayNotHasKey(Extractor::METHOD_BUNDLED, $extractor->getUnavailableReasons());
     }
 
+    public function testDownloadsAMissingBinary(): void
+    {
+        // what SHA256SUMS lists, not a local build from ZSTD_EXTRACT_BINARY
+        $name = (string) NativeExtractor::getPlatformBinaryName();
+        $binary = \dirname(__DIR__).'/bin/'.$name;
+        if ($name === '' || !is_file($binary)) {
+            self::markTestSkipped('No bundled binary for this platform');
+        }
+        $calls = [];
+        $downloader = static function (string $file, string $sha256) use ($binary, &$calls): string {
+            $calls[] = [$file, $sha256];
+
+            return (string) file_get_contents($binary);
+        };
+        $extractor = new Extractor($this->tmp.'/cache', [Extractor::METHOD_BUNDLED], $this->tmp.'/'.$name, null, Extractor::DEFAULT_MAX_SIZE, $downloader);
+        $extractor->extract($this->archive(), $this->tmp.'/dest');
+        self::assertSame(Extractor::METHOD_BUNDLED, $extractor->getLastMethod());
+        self::assertSame([[$name, hash_file('sha256', $binary)]], $calls);
+        self::assertCount(1, self::glob($this->tmp.'/cache/zstd/*-'.$name));
+
+        // the verified copy is reused
+        $extractor = new Extractor($this->tmp.'/cache', [Extractor::METHOD_BUNDLED], $this->tmp.'/'.$name, null, Extractor::DEFAULT_MAX_SIZE, $downloader);
+        $extractor->extract($this->archive(), $this->tmp.'/dest2');
+        self::assertCount(1, $calls);
+    }
+
+    /**
+     * @return array<string, array{callable(string, string): string, string}>
+     */
+    public static function provideBadDownloads(): array
+    {
+        return [
+            'wrong content' => [static function (): string {
+                return 'not the binary';
+            }, 'does not match its SHA-256'],
+            'failure' => [static function (): string {
+                throw new \RuntimeException('offline');
+            }, 'offline'],
+        ];
+    }
+
+    /**
+     * @dataProvider provideBadDownloads
+     * @param callable(string, string): string $downloader
+     */
+    public function testBadDownloadFallsBack(callable $downloader, string $reason): void
+    {
+        $name = (string) NativeExtractor::getPlatformBinaryName();
+        $extractor = new Extractor($this->tmp.'/cache', [Extractor::METHOD_BUNDLED, Extractor::METHOD_PHP], $this->tmp.'/'.$name, null, Extractor::DEFAULT_MAX_SIZE, $downloader);
+        $extractor->extract($this->archive(), $this->tmp.'/dest');
+        self::assertSame(Extractor::METHOD_PHP, $extractor->getLastMethod());
+        self::assertStringContainsString($reason, $extractor->getUnavailableReasons()[Extractor::METHOD_BUNDLED] ?? '');
+        self::assertSame([], self::glob($this->tmp.'/cache/zstd/*-'.$name));
+    }
+
     public function testRunsInPlace(): void
     {
         $extractor = new Extractor($this->tmp.'/cache', [Extractor::METHOD_BUNDLED], $this->requireBinary());

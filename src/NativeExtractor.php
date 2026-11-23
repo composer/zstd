@@ -16,7 +16,8 @@ namespace Composer\Zstd;
  *
  * The binary runs in place when it is a plain executable file on disk. When it cannot (inside a phar, or not
  * executable), it is copied into the "zstd" subdirectory of Composer's cache directory first, see prepareCopy()
- * for how that is kept safe.
+ * for how that is kept safe. When it is not shipped at all (e.g. left out of a phar), a downloader can fetch it,
+ * and it must match its hash from bin/SHA256SUMS.
  *
  * @internal
  */
@@ -41,15 +42,20 @@ final class NativeExtractor
     private $unavailableReason;
     /** @var string|null path of the executable file, in place or copied */
     private $path;
+    /** @var (callable(string, string): string)|null */
+    private $downloader;
 
     /**
-     * @param string|null $cacheDir   where the binary may be copied when it cannot run in place
-     * @param string|null $binaryPath overrides the bundled binary
+     * @param string|null                             $cacheDir   where the binary may be copied when it cannot run in place
+     * @param string|null                             $binaryPath overrides the bundled binary
+     * @param (callable(string, string): string)|null $downloader fetches the binary when it is not shipped, given its
+     *                                                            file name and SHA-256; returns its contents
      */
-    public function __construct(?string $cacheDir = null, ?string $binaryPath = null)
+    public function __construct(?string $cacheDir = null, ?string $binaryPath = null, ?callable $downloader = null)
     {
         $this->cacheDir = $cacheDir;
         $this->binaryPath = $binaryPath;
+        $this->downloader = $downloader;
     }
 
     public function __destruct()
@@ -232,6 +238,23 @@ final class NativeExtractor
         if ($source === null) {
             return false;
         }
+        if (\is_array($source)) {
+            [$name, $hash] = $source;
+            $downloader = $this->downloader;
+            \assert($downloader !== null);
+            try {
+                return $this->prepareCopy($name, $hash, static function () use ($downloader, $name, $hash): string {
+                    $data = $downloader($name, $hash);
+                    if (hash('sha256', $data) !== $hash) {
+                        throw new ExtractionException('The downloaded '.$name.' does not match its SHA-256 '.$hash);
+                    }
+
+                    return $data;
+                });
+            } catch (\Throwable $e) {
+                return $this->unavailable($e->getMessage());
+            }
+        }
         $inPlace = self::inPlaceCommand($source);
         if ($inPlace !== null) {
             $this->path = $inPlace;
@@ -240,13 +263,28 @@ final class NativeExtractor
         }
 
         try {
-            return $this->prepareCopy($source);
+            $hash = hash_file('sha256', $source);
+            if ($hash === false) {
+                throw new ExtractionException('Could not read '.$source);
+            }
+
+            return $this->prepareCopy(basename($source), $hash, static function () use ($source): string {
+                $data = @file_get_contents($source);
+                if ($data === false) {
+                    throw new ExtractionException('Could not read '.$source);
+                }
+
+                return $data;
+            });
         } catch (ExtractionException $e) {
             return $this->unavailable($e->getMessage());
         }
     }
 
-    private function locateSource(): ?string
+    /**
+     * @return string|array{string, string}|null the binary's path, or its name and SHA-256 to download it
+     */
+    private function locateSource()
     {
         if ($this->binaryPath !== null) {
             $source = $this->binaryPath;
@@ -260,12 +298,28 @@ final class NativeExtractor
             $source = \dirname(__DIR__).'/bin/'.$name;
         }
         if (!is_file($source)) {
+            if ($this->downloader !== null) {
+                $hash = self::expectedHash(basename($source));
+                if ($hash !== null) {
+                    return [basename($source), $hash];
+                }
+            }
             $this->unavailable($source.' does not exist');
 
             return null;
         }
 
         return $source;
+    }
+
+    private static function expectedHash(string $name): ?string
+    {
+        $sums = @file_get_contents(\dirname(__DIR__).'/bin/SHA256SUMS');
+        if ($sums !== false && preg_match('{^([0-9a-f]{64})  '.preg_quote($name).'$}m', $sums, $m) === 1) {
+            return $m[1];
+        }
+
+        return null;
     }
 
     /**
@@ -296,12 +350,11 @@ final class NativeExtractor
      * verified to be only possible for the current user (or root), who could tamper with this PHP process anyway.
      * On Linux the race is closed entirely: the verified file stays open and is executed through /proc/self/fd.
      */
-    private function prepareCopy(string $source): string
+    /**
+     * @param callable(): string $contents only called when no verified copy exists yet
+     */
+    private function prepareCopy(string $name, string $hash, callable $contents): string
     {
-        $hash = hash_file('sha256', $source);
-        if ($hash === false) {
-            throw new ExtractionException('Could not read '.$source);
-        }
         $dir = $this->cacheDir ?? self::getComposerCacheDir();
         if ($dir === null) {
             throw new ExtractionException('No cache directory available to copy the binary to');
@@ -313,18 +366,16 @@ final class NativeExtractor
             $dir = (string) realpath($dir);
         }
 
-        $target = $dir.'/'.substr($hash, 0, 16).'-'.basename($source);
+        $target = $dir.'/'.substr($hash, 0, 16).'-'.$name;
         $handle = $this->openVerified($target, $hash, $uid);
         if ($handle === null) {
+            $data = $contents();
             $tmp = $dir.'/.tmp-'.bin2hex(random_bytes(8));
-            $in = @fopen($source, 'rb');
             $out = @fopen($tmp, 'xb');
-            if ($in === false || $out === false) {
+            if ($out === false || fwrite($out, $data) !== \strlen($data) || !fclose($out)) {
+                @unlink($tmp);
                 throw new ExtractionException('Could not copy the binary to '.$dir);
             }
-            stream_copy_to_stream($in, $out);
-            fclose($in);
-            fclose($out);
             @chmod($tmp, 0700);
             if (!@rename($tmp, $target)) {
                 @unlink($tmp);

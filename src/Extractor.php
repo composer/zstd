@@ -15,7 +15,7 @@ namespace Composer\Zstd;
  * Safely extracts .tar.zst archives with the best available method.
  *
  * All methods produce the same result: decompression behaves like the reference zstd implementation, and tar
- * entries go through the same rules (implemented in C for the bundled binary, in PHP for the other methods).
+ * entries go through the same rules (implemented in Rust for the bundled binary, in PHP for the other methods).
  */
 final class Extractor
 {
@@ -56,8 +56,11 @@ final class Extractor
      * @param string|null                $zstdCliPath  zstd executable to use instead of looking it up in PATH
      * @param int                        $maxSize      archives decompressing to more bytes than this (the size of the
      *                                                 tar stream) are rejected
+     * @param (callable(string $name, string $sha256): string)|null $binaryDownloader fetches the binary for this
+     *                                                 platform when it is not shipped (e.g. left out of a phar), and
+     *                                                 returns its contents; they must match bin/SHA256SUMS
      */
-    public function __construct(?string $cacheDir = null, ?array $methods = null, ?string $bundledPath = null, ?string $zstdCliPath = null, int $maxSize = self::DEFAULT_MAX_SIZE)
+    public function __construct(?string $cacheDir = null, ?array $methods = null, ?string $bundledPath = null, ?string $zstdCliPath = null, int $maxSize = self::DEFAULT_MAX_SIZE, ?callable $binaryDownloader = null)
     {
         if ($maxSize < 1) {
             throw new \InvalidArgumentException('The maximum size must be positive');
@@ -69,7 +72,7 @@ final class Extractor
             }
         }
         $this->methods = $methods;
-        $this->bundled = new NativeExtractor($cacheDir, $bundledPath);
+        $this->bundled = new NativeExtractor($cacheDir, $bundledPath, $binaryDownloader);
         $this->cli = new ZstdCli($zstdCliPath);
     }
 

@@ -81,6 +81,9 @@ Constructor arguments, all optional:
 - `$zstdCliPath`: a `zstd` executable to use instead of looking one up in `PATH`.
 - `$maxSize`: the most an archive may decompress to, in bytes (the size of the tar stream). Defaults to 1024MB
   (`Extractor::DEFAULT_MAX_SIZE`). Larger archives are rejected, by every method.
+- `$binaryDownloader`: `function (string $name, string $sha256): string`, returning the contents of the binary for
+  this platform when it is not shipped, e.g. because a phar leaves the binaries out to save space. Its result must
+  match `bin/SHA256SUMS` and is kept in the cache directory like a copied binary (see below).
 
 `Composer\Zstd\ZstdDecoder::decompress(string $data): string` can also be used on its own.
 
@@ -230,7 +233,8 @@ identically for these two later on, but their attestations stay valid.
 When this package is installed normally, the binary in `vendor/composer/zstd/bin/` runs in place. Anyone able to
 replace it could equally modify the PHP code next to it.
 
-From inside a phar the binary cannot be executed directly, so it is copied out first:
+From inside a phar the binary cannot be executed directly, so it is copied out first. A downloaded binary takes the
+same path, its hash checked against `bin/SHA256SUMS`, which then has to be shipped:
 
 1. The copy goes to `<cacheDir>/zstd/`, which must be owned by the current user, and is made private (`0700`)
    if group or others can write to it. Every ancestor directory must be owned by the user or root, and be sticky
