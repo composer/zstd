@@ -186,7 +186,8 @@ standard library, plus the vendored zstd decoder, compiled from C. Only the FFI 
 setup use `unsafe`; the archive parsing and every filesystem operation are safe Rust. On Linux, they link
 statically against musl (static-pie, RELRO, stack protector and `_FORTIFY_SOURCE` for the C part), inside a
 toolchain container pinned by digest (`native/build-linux.sh`). macOS links the system library dynamically as macOS
-has no static libc. Windows uses MSVC with a static C runtime (`/GS`, Control Flow Guard, ASLR). Where no binary runs,
+has no static libc. Windows uses MSVC with a static C runtime and ASLR; `/GS` and Control Flow Guard cover the C
+part, CFG also this crate's Rust code, but not Rust's prebuilt standard library. Where no binary runs,
 e.g. Windows 10 on arm64 or other architectures, the next method is used. musl is
 used instead of glibc because it is MIT licensed, where a statically linked glibc would bring LGPL obligations. It
 is also as fast and 5x smaller. The builds are reproducible: every build runs twice and fails unless both
