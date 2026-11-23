@@ -20,6 +20,11 @@ parameters:
                 - src/ZstdDecoder.php
                 - tests/TarBuilder.php
             reportUnmatched: false
+        # proc_get_status() is typed as returning false on PHP < 8, which it only does for an invalid process
+        -
+            message: '#^Cannot access offset .(running|signaled). on array\{.*\}\|false\.$#'
+            path: src/NativeExtractor.php
+            reportUnmatched: false
 
 includes:
     - vendor/phpstan/phpstan/conf/bleedingEdge.neon

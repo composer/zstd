@@ -70,7 +70,8 @@ class NativeExtractorTest extends TestCase
             $extractor->extract($this->archive(), $this->tmp.'/dest');
             self::fail('Expected an exception');
         } catch (ExtractionException $e) {
-            self::assertSame('zstd-extract exited with code 129', $e->getMessage());
+            // PHP < 7.4 runs it through sh, which adds "Hangup"
+            self::assertStringStartsWith('zstd-extract exited with code 129', $e->getMessage());
         }
         self::assertArrayNotHasKey(Extractor::METHOD_BUNDLED, $extractor->getUnavailableReasons());
     }
