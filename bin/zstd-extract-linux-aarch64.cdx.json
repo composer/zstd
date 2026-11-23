@@ -17,7 +17,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "d8126035745efe5c0a680683a6cf311d3426c3e184ce89e0409d8d9da50b6e83"
+          "content": "f1fb13a5ad398830a12a37b4abeff6735c5653b0ce0e915206fcec47aaa63b83"
         }
       ],
       "licenses": [
@@ -105,10 +105,128 @@
       "version": "1.99.1",
       "licenses": [
         {
+          "expression": "(MIT OR Apache-2.0) AND Unicode-3.0"
+        }
+      ],
+      "purl": "pkg:github/rust-lang/rust@1.99.1",
+      "cpe": "cpe:2.3:a:rust-lang:rust:1.99.1:*:*:*:*:*:*:*"
+    },
+    {
+      "type": "library",
+      "bom-ref": "compiler-builtins",
+      "name": "compiler-builtins",
+      "version": "1.99.1",
+      "description": "Part of the Rust toolchain, with code ported from LLVM compiler-rt",
+      "licenses": [
+        {
+          "expression": "MIT AND Apache-2.0 WITH LLVM-exception AND (MIT OR Apache-2.0)"
+        }
+      ],
+      "purl": "pkg:github/rust-lang/rust@1.99.1#library/compiler-builtins"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-addr2line",
+      "name": "addr2line",
+      "version": "0.27.1",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "Apache-2.0 OR MIT"
+        }
+      ],
+      "purl": "pkg:cargo/addr2line@0.27.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-adler2",
+      "name": "adler2",
+      "version": "2.0.1",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "0BSD OR MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/adler2@2.0.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-gimli",
+      "name": "gimli",
+      "version": "0.34.0",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
           "expression": "MIT OR Apache-2.0"
         }
       ],
-      "purl": "pkg:github/rust-lang/rust@1.99.1"
+      "purl": "pkg:cargo/gimli@0.34.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-hashbrown",
+      "name": "hashbrown",
+      "version": "0.17.1",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/hashbrown@0.17.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-libc",
+      "name": "libc",
+      "version": "0.2.189",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/libc@0.2.189"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-miniz_oxide",
+      "name": "miniz_oxide",
+      "version": "0.9.1",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "MIT OR Zlib OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/miniz_oxide@0.9.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-object",
+      "name": "object",
+      "version": "0.39.1",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "Apache-2.0 OR MIT"
+        }
+      ],
+      "purl": "pkg:cargo/object@0.39.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-rustc-demangle",
+      "name": "rustc-demangle",
+      "version": "0.1.28",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/rustc-demangle@0.1.28"
     }
   ],
   "dependencies": [
@@ -119,7 +237,16 @@
         "musl",
         "llvm-libunwind",
         "fortify-headers",
-        "rust-std"
+        "rust-std",
+        "compiler-builtins",
+        "crate-addr2line",
+        "crate-adler2",
+        "crate-gimli",
+        "crate-hashbrown",
+        "crate-libc",
+        "crate-miniz_oxide",
+        "crate-object",
+        "crate-rustc-demangle"
       ]
     }
   ],

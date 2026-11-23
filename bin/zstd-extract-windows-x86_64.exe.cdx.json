@@ -17,7 +17,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "8d1881fa1c49880cb55f2fa8128bc98771c50edd3e393f0673286733ef781c7a"
+          "content": "2d96d87b478fbad25db1a39e594e0aa59118875d4716672ccb52543ed532731f"
         }
       ],
       "licenses": [
@@ -91,10 +91,50 @@
       "version": "1.99.1",
       "licenses": [
         {
+          "expression": "(MIT OR Apache-2.0) AND Unicode-3.0"
+        }
+      ],
+      "purl": "pkg:github/rust-lang/rust@1.99.1",
+      "cpe": "cpe:2.3:a:rust-lang:rust:1.99.1:*:*:*:*:*:*:*"
+    },
+    {
+      "type": "library",
+      "bom-ref": "compiler-builtins",
+      "name": "compiler-builtins",
+      "version": "1.99.1",
+      "description": "Part of the Rust toolchain, with code ported from LLVM compiler-rt",
+      "licenses": [
+        {
+          "expression": "MIT AND Apache-2.0 WITH LLVM-exception AND (MIT OR Apache-2.0)"
+        }
+      ],
+      "purl": "pkg:github/rust-lang/rust@1.99.1#library/compiler-builtins"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-hashbrown",
+      "name": "hashbrown",
+      "version": "0.17.1",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
           "expression": "MIT OR Apache-2.0"
         }
       ],
-      "purl": "pkg:github/rust-lang/rust@1.99.1"
+      "purl": "pkg:cargo/hashbrown@0.17.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-rustc-demangle",
+      "name": "rustc-demangle",
+      "version": "0.1.28",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/rustc-demangle@0.1.28"
     }
   ],
   "dependencies": [
@@ -104,7 +144,10 @@
         "zstd",
         "vcruntime",
         "ucrt",
-        "rust-std"
+        "rust-std",
+        "compiler-builtins",
+        "crate-hashbrown",
+        "crate-rustc-demangle"
       ]
     }
   ],

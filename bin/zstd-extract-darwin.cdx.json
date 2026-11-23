@@ -17,7 +17,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "f8260e7aaf22cb49c29d94a7a3be7a17a2da8f9a16ed3e3dc084b9d2880d5a46"
+          "content": "7292f7618ee5a0f402d695dcde456244241dda73b3c71b9df88728c293117ed9"
         }
       ],
       "licenses": [
@@ -65,10 +65,102 @@
       "version": "1.99.1",
       "licenses": [
         {
+          "expression": "(MIT OR Apache-2.0) AND Unicode-3.0"
+        }
+      ],
+      "purl": "pkg:github/rust-lang/rust@1.99.1",
+      "cpe": "cpe:2.3:a:rust-lang:rust:1.99.1:*:*:*:*:*:*:*"
+    },
+    {
+      "type": "library",
+      "bom-ref": "compiler-builtins",
+      "name": "compiler-builtins",
+      "version": "1.99.1",
+      "description": "Part of the Rust toolchain, with code ported from LLVM compiler-rt",
+      "licenses": [
+        {
+          "expression": "MIT AND Apache-2.0 WITH LLVM-exception AND (MIT OR Apache-2.0)"
+        }
+      ],
+      "purl": "pkg:github/rust-lang/rust@1.99.1#library/compiler-builtins"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-addr2line",
+      "name": "addr2line",
+      "version": "0.27.1",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "Apache-2.0 OR MIT"
+        }
+      ],
+      "purl": "pkg:cargo/addr2line@0.27.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-gimli",
+      "name": "gimli",
+      "version": "0.34.0",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
           "expression": "MIT OR Apache-2.0"
         }
       ],
-      "purl": "pkg:github/rust-lang/rust@1.99.1"
+      "purl": "pkg:cargo/gimli@0.34.0"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-hashbrown",
+      "name": "hashbrown",
+      "version": "0.17.1",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/hashbrown@0.17.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-libc",
+      "name": "libc",
+      "version": "0.2.189",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/libc@0.2.189"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-object",
+      "name": "object",
+      "version": "0.39.1",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "Apache-2.0 OR MIT"
+        }
+      ],
+      "purl": "pkg:cargo/object@0.39.1"
+    },
+    {
+      "type": "library",
+      "bom-ref": "crate-rustc-demangle",
+      "name": "rustc-demangle",
+      "version": "0.1.28",
+      "description": "Part of the Rust standard library build",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:cargo/rustc-demangle@0.1.28"
     }
   ],
   "dependencies": [
@@ -76,7 +168,14 @@
       "ref": "zstd-extract",
       "dependsOn": [
         "zstd",
-        "rust-std"
+        "rust-std",
+        "compiler-builtins",
+        "crate-addr2line",
+        "crate-gimli",
+        "crate-hashbrown",
+        "crate-libc",
+        "crate-object",
+        "crate-rustc-demangle"
       ]
     }
   ],
