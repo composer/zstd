@@ -371,6 +371,7 @@ final class ZstdDecoder
 
         [$r1, $r2, $r3] = $rep;
         $litPos = 0;
+        $written = 0;
         $el = $em = $eo = 0;
         for ($i = 1; $i <= $nbSeq; $i++) {
             if ($avail < 32) {
@@ -436,6 +437,11 @@ final class ZstdDecoder
 
             if ($r1 > \strlen($out) + $ll || $r1 <= 0 || $r1 > $maxOffset) {
                 throw new ExtractionException('zstd match offset out of range');
+            }
+            // checked per sequence, ~100k long matches would otherwise build gigabytes before the block ends
+            $written += $ll + $ml;
+            if ($written > $blockMax) {
+                throw new ExtractionException('zstd block decompresses beyond the maximum block size');
             }
             if ($r1 >= $ll + $ml) {
                 // match source lies entirely in already written output: one append for literals + match

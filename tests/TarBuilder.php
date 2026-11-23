@@ -142,6 +142,21 @@ final class TarBuilder
     }
 
     /**
+     * A frame whose compressed block holds $count maximum length matches, each 131074 bytes.
+     */
+    public static function matchBomb(int $count): string
+    {
+        $out = pack('V', 0xFD2FB528)."\0".\chr((17 - 10) << 3);
+        // a raw block giving the matches something to copy
+        $out .= \chr(4 << 3)."\0\0".'xxxx';
+        // no literals; RLE tables: literal length 0, repeat offset, match length code 52 with all 16 extra bits set
+        $block = "\0".\chr(0x80 | ($count >> 8)).\chr($count & 0xFF)."\x54\0\0\x34".str_repeat("\xFF", $count * 2)."\x01";
+        $bh = 1 | (2 << 1) | (\strlen($block) << 3);
+
+        return $out.\chr($bh & 0xFF).\chr(($bh >> 8) & 0xFF).\chr($bh >> 16).$block;
+    }
+
+    /**
      * A tiny frame of RLE blocks decompressing to $size zero bytes (an empty tar), without declaring its size.
      */
     public static function zeroBomb(int $size): string

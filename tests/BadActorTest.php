@@ -110,6 +110,7 @@ class BadActorTest extends TestCase
             'reserved header bit' => [substr_replace($zst, \chr(\ord($zst[4]) | 8), 4, 1), '{reserved|unsupported|frame parameter|corrupt}i'],
             'reserved block type' => [substr_replace($zst, \chr(\ord($zst[13]) | 6), 13, 1), '{reserved|corrupt}i'],
             'content size over 2^63' => [substr_replace(TarBuilder::zstdFrame($valid->build(), 20), pack('P', -5), 6, 8), '{size|corrupt}i'],
+            'matches beyond the block size' => [TarBuilder::matchBomb(30000), '{maximum block size|buffer is too small|corrupt}i'],
             'content size mismatch' => [substr_replace($zst, pack('P', 9999), 5, 8), '{size|corrupt}i'],
         ];
         if (ZstdDecoder::canVerifyChecksums()) {
