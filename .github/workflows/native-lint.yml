@@ -53,7 +53,8 @@ jobs:
 
       - name: clippy (with cl and lib for build.rs)
         if: runner.os == 'Windows'
-        shell: cmd
+        shell: pwsh
         run: |
-          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" x64 >nul
-          cargo clippy --locked --target x86_64-pc-windows-msvc -- -D warnings
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath
+          cmd /c "`"$vs\VC\Auxiliary\Build\vcvarsall.bat`" x64 >nul && cargo clippy --locked --target x86_64-pc-windows-msvc -- -D warnings"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
