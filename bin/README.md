@@ -13,4 +13,5 @@ Each `<binary>.cdx.json` is the binary's CycloneDX SBOM, listing the exact versi
 
 Besides this package's own MIT licensed code (see ../LICENSE), they contain the zstd decoder (BSD licensed, see
 LICENSE.zstd), the Rust standard library (MIT licensed, see LICENSE.rust) and, on Linux, the musl C library (MIT
-licensed, see LICENSE.musl).
+licensed, see LICENSE.musl). The rest, LLVM's libunwind on Linux and the Microsoft C runtime on Windows, require no
+notice, see ../README.md.
