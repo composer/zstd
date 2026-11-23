@@ -1,9 +1,14 @@
 #!/bin/bash
 # Writes a CycloneDX SBOM (<binary>.cdx.json) for each binary in $1, from the <binary>.toolchain file its build
 # left there, then removes the toolchain files. Nothing in the output depends on when or where this runs.
+# Needs the pinned Rust toolchain with its rust-src component, for the versions of the crates std is built from.
 set -euo pipefail
 
 dir=$1
+sysroot=$(cd native && rustc --print sysroot)
+rustc_version=$(cd native && rustc --version | cut -d' ' -f2)
+std_lock="$sysroot/lib/rustlib/src/rust/library/Cargo.lock"
+[ -f "$std_lock" ] || { echo "no $std_lock, install the rust-src component" >&2; exit 1; }
 version=$(sed -n '1,/^\[/!b; s/^version = "\(.*\)"$/\1/p' native/Cargo.toml)
 zstd=$(sed -n 's/.* v\([0-9.]*\) release.*/\1/p' native/zstd/README.md)
 zstd_sha=$(sed -n 's/^SHA-256: //p' native/zstd/README.md)
@@ -29,13 +34,57 @@ tool() {
     jq -n --arg name "$1" --arg version "$2" '{type: "application", name: $name, version: $version}'
 }
 
-# the Rust standard library, linked statically on every platform
-rust_std() {
-    jq -n --arg version "$(tc rustc)" '{
-        type: "library", "bom-ref": "rust-std", name: "Rust standard library", version: $version,
-        licenses: [{expression: "MIT OR Apache-2.0"}],
-        purl: "pkg:github/rust-lang/rust@\($version)"
-    }'
+# crates.io crates std is built from, with their licenses
+declare -A crate_license=(
+    [addr2line]="Apache-2.0 OR MIT"
+    [adler2]="0BSD OR MIT OR Apache-2.0"
+    [gimli]="MIT OR Apache-2.0"
+    [hashbrown]="MIT OR Apache-2.0"
+    [libc]="MIT OR Apache-2.0"
+    [miniz_oxide]="MIT OR Zlib OR Apache-2.0"
+    [object]="Apache-2.0 OR MIT"
+    [rustc-demangle]="MIT OR Apache-2.0"
+)
+
+# Rust's std and the crates it brings into the binary. Crates with panic messages carry their source path,
+# /rust/deps/<name>-<version>/, the others are known to be there: hashbrown backs HashMap, libc and object are
+# used by std everywhere but on Windows, adler2 by miniz_oxide.
+rust_components() {
+    local bin=$1 windows=$2 crates
+    crates=$(LC_ALL=C grep -aoE '/rust/deps[/\\][A-Za-z0-9_-]+-[0-9][0-9A-Za-z.+-]*[/\\]' "$bin" | sed -E 's#^/rust/deps.##; s#.$##' | sort -u)
+    crates=$(printf '%s\n' "$crates" hashbrown-auto)
+    [ "$windows" = 1 ] || crates=$(printf '%s\n' "$crates" libc-auto object-auto)
+    case $crates in *miniz_oxide-*) crates=$(printf '%s\n' "$crates" adler2-auto) ;; esac
+    [ "$(tc rustc)" = "$rustc_version" ] || { echo "$bin: built with rustc $(tc rustc), but $rustc_version is installed" >&2; exit 1; }
+    local list=() crate name found lock_version
+    for crate in $(printf '%s\n' "$crates" | sed '/^$/d' | sort -u); do
+        name=${crate%-*}
+        found=${crate##*-}
+        lock_version=$(awk -v n="$name" '$0 == "name = \"" n "\"" { getline; gsub(/version = |"/, ""); print; exit }' "$std_lock")
+        [ -n "$lock_version" ] || { echo "$bin: $name is not one of std's dependencies" >&2; exit 1; }
+        [ "$found" = auto ] || [ "$found" = "$lock_version" ] || { echo "$bin: $name $found, std uses $lock_version" >&2; exit 1; }
+        [ -n "${crate_license[$name]:-}" ] || { echo "$bin: unknown crate $name, add its license to sbom.sh" >&2; exit 1; }
+        list+=("$(jq -n --arg name "$name" --arg version "$lock_version" --arg license "${crate_license[$name]}" '{
+            type: "library", "bom-ref": "crate-\($name)", name: $name, version: $version,
+            description: "Part of the Rust standard library build",
+            licenses: [{expression: $license}],
+            purl: "pkg:cargo/\($name)@\($version)"
+        }')")
+    done
+    jq -n --arg version "$rustc_version" '[
+        {
+            type: "library", "bom-ref": "rust-std", name: "Rust standard library", version: $version,
+            licenses: [{expression: "(MIT OR Apache-2.0) AND Unicode-3.0"}],
+            purl: "pkg:github/rust-lang/rust@\($version)",
+            cpe: "cpe:2.3:a:rust-lang:rust:\($version):*:*:*:*:*:*:*"
+        },
+        {
+            type: "library", "bom-ref": "compiler-builtins", name: "compiler-builtins", version: $version,
+            description: "Part of the Rust toolchain, with code ported from LLVM compiler-rt",
+            licenses: [{expression: "MIT AND Apache-2.0 WITH LLVM-exception AND (MIT OR Apache-2.0)"}],
+            purl: "pkg:github/rust-lang/rust@\($version)#library/compiler-builtins"
+        }
+    ] + ($ARGS.positional | map(fromjson))' --args "${list[@]}"
 }
 
 for name in zstd-extract-linux-x86_64 zstd-extract-linux-aarch64 zstd-extract-darwin zstd-extract-windows-x86_64.exe; do
@@ -48,8 +97,7 @@ for name in zstd-extract-linux-x86_64 zstd-extract-linux-aarch64 zstd-extract-da
             linked=$(jq -n '$ARGS.positional | map(fromjson)' --args \
                 "$(apk musl musl MIT)" \
                 "$(apk llvm-libunwind llvm-libunwind-static 'Apache-2.0 WITH LLVM-exception')" \
-                "$(apk fortify-headers fortify-headers 0BSD)" \
-                "$(rust_std)")
+                "$(apk fortify-headers fortify-headers 0BSD)")
             tools=$(jq -n '$ARGS.positional | map(fromjson)' --args \
                 "$(tool rustc "$(tc rustc)")" \
                 "$(apk gcc gcc 'GPL-3.0-or-later' | jq '.type = "application" | del(."bom-ref")')" \
@@ -58,21 +106,22 @@ for name in zstd-extract-linux-x86_64 zstd-extract-linux-aarch64 zstd-extract-da
             ;;
         *-darwin)
             # libSystem is linked dynamically, so only zstd and Rust's std are part of the binary
-            linked=$(jq -n '$ARGS.positional | map(fromjson)' --args "$(rust_std)")
+            linked='[]'
             tools=$(jq -n '$ARGS.positional | map(fromjson)' --args \
                 "$(tool rustc "$(tc rustc)")" "$(tool 'Apple clang' "$(tc clang)")" "$(tool 'macOS SDK' "$(tc sdk)")")
             ;;
         *-windows-*)
             license='{"license": {"name": "Microsoft Visual Studio and Windows SDK license terms"}}'
-            linked=$(jq -n --arg msvc "$(tc msvc)" --arg ucrt "$(tc ucrt)" --argjson license "$license" --argjson std "$(rust_std)" '[
+            linked=$(jq -n --arg msvc "$(tc msvc)" --arg ucrt "$(tc ucrt)" --argjson license "$license" '[
                 {type: "library", "bom-ref": "vcruntime", name: "Microsoft Visual C++ runtime (static)", version: $msvc, licenses: [$license]},
-                {type: "library", "bom-ref": "ucrt", name: "Microsoft Universal C runtime (static)", version: $ucrt, licenses: [$license]},
-                $std
+                {type: "library", "bom-ref": "ucrt", name: "Microsoft Universal C runtime (static)", version: $ucrt, licenses: [$license]}
             ]')
             tools=$(jq -n '$ARGS.positional | map(fromjson)' --args \
                 "$(tool rustc "$(tc rustc)")" "$(tool 'MSVC' "$(tc msvc)")" "$(tool 'Windows SDK' "$(tc sdk)")")
             ;;
     esac
+    case $name in *-windows-*) windows=1 ;; *) windows=0 ;; esac
+    linked=$(jq -n --argjson linked "$linked" --argjson rust "$(rust_components "$dir/$name" "$windows")" '$linked + $rust')
 
     jq -n --arg name "$name" --arg version "$version" --arg sha "$(sha256sum "$dir/$name" | cut -d' ' -f1)" \
         --arg zstd "$zstd" --arg zstd_sha "$zstd_sha" --argjson linked "$linked" --argjson tools "$tools" '{

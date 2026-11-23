@@ -131,6 +131,11 @@ jobs:
           pattern: '{linux-*,darwin,windows-*}'
           merge-multiple: true
 
+      # the pinned toolchain's rust-src has the versions of the crates std is built from
+      - name: Install rust-src
+        working-directory: native
+        run: rustup toolchain install && rustup component add rust-src
+
       - name: SBOMs and checksums
         run: |
           .github/scripts/sbom.sh "$RUNNER_TEMP/bin"
