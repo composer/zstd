@@ -85,6 +85,9 @@ Constructor arguments, all optional:
   this platform when it is not shipped, e.g. because a phar leaves the binaries out to save space. Its result must
   match `bin/SHA256SUMS` and is kept in the cache directory like a copied binary (see below).
 
+`Extractor::validateFile($archive)` checks that a file is a complete zstd stream without decompressing it, e.g. to
+detect a truncated download. It throws an `ExtractionException` otherwise.
+
 `Composer\Zstd\ZstdDecoder::decompress(string $data): string` can also be used on its own.
 
 Methods

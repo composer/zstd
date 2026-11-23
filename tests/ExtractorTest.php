@@ -36,6 +36,21 @@ class ExtractorTest extends TestCase
     /**
      * Fails when a method CI is expected to cover is missing, instead of silently skipping it.
      */
+    public function testValidateFile(): void
+    {
+        $zst = (new TarBuilder())->file('a', str_repeat('x', 3000))->zst();
+        Extractor::validateFile($this->writeArchive($zst));
+
+        foreach (['truncated' => substr($zst, 0, -10), 'trailing data' => $zst.'garbage', 'not zstd' => 'garbage'] as $case => $data) {
+            try {
+                Extractor::validateFile($this->writeArchive($data));
+                self::fail($case.' was accepted');
+            } catch (ExtractionException $e) {
+                self::assertNotSame('', $e->getMessage());
+            }
+        }
+    }
+
     public function testRequiredMethodsAreAvailable(): void
     {
         $required = getenv('ZSTD_TEST_REQUIRE_METHODS');

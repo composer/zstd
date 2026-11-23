@@ -156,6 +156,19 @@ final class Extractor
     }
 
     /**
+     * Checks that a file is a complete zstd stream, without decompressing it, e.g. to detect truncated downloads.
+     *
+     * Only the structure is checked (frame headers, block sizes, truncation, trailing data). Corrupted compressed
+     * data inside a block is only detected when extracting.
+     *
+     * @throws ExtractionException when the file is not a complete zstd stream
+     */
+    public static function validateFile(string $archive): void
+    {
+        ZstdDecoder::scanFrames(self::read($archive));
+    }
+
+    /**
      * The methods that can be used here, in the order they would be tried.
      *
      * This checks each of them, which for the bundled binary means copying it out of a phar and running it once.
