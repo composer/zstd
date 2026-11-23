@@ -69,7 +69,7 @@ jobs:
         if: runner.os == 'macOS'
         run: command -v zstd || brew install zstd
 
-      # test the current C sources, not just the committed binaries
+      # test the current native/ sources, not just the committed binaries
       - name: Build native binary (Linux)
         if: runner.os == 'Linux'
         run: |
@@ -79,7 +79,7 @@ jobs:
       - name: Build native binary (macOS)
         if: runner.os == 'macOS'
         run: |
-          make -C native darwin
+          native/build-darwin.sh
           echo "ZSTD_EXTRACT_BINARY=$PWD/native/build/zstd-extract-darwin" >> "$GITHUB_ENV"
 
       - name: Build native binary (Windows)

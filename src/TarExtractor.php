@@ -14,7 +14,7 @@ namespace Composer\Zstd;
 /**
  * Extracts an in-memory tar archive into an empty directory.
  *
- * The rules must stay identical to native/src/main.c, see README.md "Safety rules".
+ * The rules must stay identical to native/src/main.rs, see README.md "Safety rules".
  *
  * @internal
  */

@@ -1,0 +1,4 @@
+[toolchain]
+# also the version of the builder image (Dockerfile)
+channel = "1.99.1"
+profile = "minimal"

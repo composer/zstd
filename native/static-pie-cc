@@ -1,0 +1,8 @@
+#!/bin/sh
+# rustc links aarch64 musl binaries static but not position independent (its target spec lacks static-pie,
+# unlike x86_64): link them as static-pie instead, for ASLR. The objects are position independent already.
+for arg; do
+    shift
+    case $arg in -static|-no-pie) ;; *) set -- "$@" "$arg" ;; esac
+done
+exec cc -static-pie "$@"

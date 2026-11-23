@@ -73,9 +73,9 @@ jobs:
           TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
-          cp LICENSE bin/LICENSE.zstd bin/LICENSE.musl "$RUNNER_TEMP/built/"
+          cp LICENSE bin/LICENSE.zstd bin/LICENSE.musl bin/LICENSE.rust "$RUNNER_TEMP/built/"
           cd "$RUNNER_TEMP/built"
-          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber zstd-extract-* SHA256SUMS LICENSE LICENSE.zstd LICENSE.musl
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber zstd-extract-* SHA256SUMS LICENSE LICENSE.zstd LICENSE.musl LICENSE.rust
 
       - name: Check the uploaded assets
         env:

@@ -1,0 +1,59 @@
+name: "Native lint"
+
+on:
+  push:
+    paths:
+      - 'native/**'
+      - '.github/workflows/native-lint.yml'
+  pull_request:
+    paths:
+      - 'native/**'
+      - '.github/workflows/native-lint.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: "rustfmt and clippy (${{ matrix.target }})"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+    defaults:
+      run:
+        working-directory: native
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # the version from rust-toolchain.toml
+      - run: rustup toolchain install && rustup component add rustfmt clippy
+
+      - run: cargo fmt --check
+
+      - name: clippy
+        if: runner.os != 'Windows'
+        env:
+          TARGET: ${{ matrix.target }}
+        run: cargo clippy --locked --target "$TARGET" -- -D warnings
+
+      - name: clippy (with cl and lib for build.rs)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" x64 >nul
+          cargo clippy --locked --target x86_64-pc-windows-msvc -- -D warnings

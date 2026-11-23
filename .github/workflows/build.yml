@@ -67,9 +67,10 @@ jobs:
       - name: Build
         run: |
           bin=native/build/zstd-extract-darwin
-          make -C native darwin
+          native/build-darwin.sh
           cp "$bin" "$RUNNER_TEMP/first"
-          make -C native clean darwin
+          rm -rf native/build native/target
+          native/build-darwin.sh
           cmp "$RUNNER_TEMP/first" "$bin" # the build must be reproducible
           lipo -archs "$bin" | grep -q 'x86_64 arm64'
           codesign --verify "$bin"
@@ -98,7 +99,7 @@ jobs:
           cmd /c native\build-windows.cmd
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Copy-Item $bin "$env:RUNNER_TEMP\first.exe"
-          Remove-Item -Recurse native\build
+          Remove-Item -Recurse native\build, native\target
           cmd /c native\build-windows.cmd
           if ($LASTEXITCODE -ne 0) { exit 1 }
           # the build must be reproducible

@@ -4,7 +4,7 @@
 set -euo pipefail
 
 dir=$1
-version=$(sed -n 's/^#define EXTRACT_VERSION "\(.*\)"$/\1/p' native/src/main.c)
+version=$(sed -n '1,/^\[/!b; s/^version = "\(.*\)"$/\1/p' native/Cargo.toml)
 zstd=$(sed -n 's/.* v\([0-9.]*\) release.*/\1/p' native/zstd/README.md)
 zstd_sha=$(sed -n 's/^SHA-256: //p' native/zstd/README.md)
 [ -n "$version" ] && [ -n "$zstd" ] && [ -n "$zstd_sha" ]
@@ -29,36 +29,48 @@ tool() {
     jq -n --arg name "$1" --arg version "$2" '{type: "application", name: $name, version: $version}'
 }
 
+# the Rust standard library, linked statically on every platform
+rust_std() {
+    jq -n --arg version "$(tc rustc)" '{
+        type: "library", "bom-ref": "rust-std", name: "Rust standard library", version: $version,
+        licenses: [{expression: "MIT OR Apache-2.0"}],
+        purl: "pkg:github/rust-lang/rust@\($version)"
+    }'
+}
+
 for name in zstd-extract-linux-x86_64 zstd-extract-linux-aarch64 zstd-extract-darwin zstd-extract-windows-x86_64.exe; do
     toolchain="$dir/$name.toolchain"
     case $name in
         *-linux-*)
             arch=${name##*-}
             image=$(tc image)
-            # linked statically: libc, compiler runtime (libgcc.a is part of the gcc package) and the inlined checks
+            # linked statically: libc, unwinder, the inlined checks of the C part, and Rust's std
             linked=$(jq -n '$ARGS.positional | map(fromjson)' --args \
                 "$(apk musl musl MIT)" \
-                "$(apk libgcc gcc 'GPL-3.0-or-later WITH GCC-exception-3.1')" \
-                "$(apk fortify-headers fortify-headers 0BSD)")
+                "$(apk llvm-libunwind llvm-libunwind-static 'Apache-2.0 WITH LLVM-exception')" \
+                "$(apk fortify-headers fortify-headers 0BSD)" \
+                "$(rust_std)")
             tools=$(jq -n '$ARGS.positional | map(fromjson)' --args \
+                "$(tool rustc "$(tc rustc)")" \
                 "$(apk gcc gcc 'GPL-3.0-or-later' | jq '.type = "application" | del(."bom-ref")')" \
                 "$(apk binutils binutils 'GPL-3.0-or-later' | jq '.type = "application" | del(."bom-ref")')" \
                 "$(jq -n --arg image "$image" '{type: "container", name: ($image | split("@")[0]), version: ($image | split("@")[1])}')")
             ;;
         *-darwin)
-            # libSystem is linked dynamically, so nothing but zstd is part of the binary
-            linked='[]'
+            # libSystem is linked dynamically, so only zstd and Rust's std are part of the binary
+            linked=$(jq -n '$ARGS.positional | map(fromjson)' --args "$(rust_std)")
             tools=$(jq -n '$ARGS.positional | map(fromjson)' --args \
-                "$(tool 'Apple clang' "$(tc clang)")" "$(tool 'macOS SDK' "$(tc sdk)")")
+                "$(tool rustc "$(tc rustc)")" "$(tool 'Apple clang' "$(tc clang)")" "$(tool 'macOS SDK' "$(tc sdk)")")
             ;;
         *-windows-*)
             license='{"license": {"name": "Microsoft Visual Studio and Windows SDK license terms"}}'
-            linked=$(jq -n --arg msvc "$(tc msvc)" --arg ucrt "$(tc ucrt)" --argjson license "$license" '[
+            linked=$(jq -n --arg msvc "$(tc msvc)" --arg ucrt "$(tc ucrt)" --argjson license "$license" --argjson std "$(rust_std)" '[
                 {type: "library", "bom-ref": "vcruntime", name: "Microsoft Visual C++ runtime (static)", version: $msvc, licenses: [$license]},
-                {type: "library", "bom-ref": "ucrt", name: "Microsoft Universal C runtime (static)", version: $ucrt, licenses: [$license]}
+                {type: "library", "bom-ref": "ucrt", name: "Microsoft Universal C runtime (static)", version: $ucrt, licenses: [$license]},
+                $std
             ]')
             tools=$(jq -n '$ARGS.positional | map(fromjson)' --args \
-                "$(tool 'MSVC' "$(tc msvc)")" "$(tool 'Windows SDK' "$(tc sdk)")")
+                "$(tool rustc "$(tc rustc)")" "$(tool 'MSVC' "$(tc msvc)")" "$(tool 'Windows SDK' "$(tc sdk)")")
             ;;
     esac
 

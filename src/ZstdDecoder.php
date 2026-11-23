@@ -233,7 +233,7 @@ final class ZstdDecoder
     }
 
     /**
-     * @internal the message must match native/src/main.c
+     * @internal the message must match native/src/main.rs
      */
     public static function tooLarge(int $maxSize): ExtractionException
     {

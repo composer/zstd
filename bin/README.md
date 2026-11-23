@@ -12,4 +12,5 @@ gh attestation verify bin/zstd-extract-linux-x86_64 --repo composer/zstd
 Each `<binary>.cdx.json` is the binary's CycloneDX SBOM, listing the exact versions of everything linked into it.
 
 Besides this package's own MIT licensed code (see ../LICENSE), they contain the zstd decoder (BSD licensed, see
-LICENSE.zstd) and, on Linux, the musl C library (MIT licensed, see LICENSE.musl).
+LICENSE.zstd), the Rust standard library (MIT licensed, see LICENSE.rust) and, on Linux, the musl C library (MIT
+licensed, see LICENSE.musl).

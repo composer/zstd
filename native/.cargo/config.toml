@@ -1,0 +1,12 @@
+# the binary parses untrusted archives: keep exploit mitigations explicit rather than relying on defaults
+[target.x86_64-pc-windows-msvc]
+# statically linked CRT like /MT, control flow guard, and no build paths or timestamps in the image
+rustflags = ["-C", "target-feature=+crt-static", "-C", "control-flow-guard", "-C", "link-arg=/Brepro", "-C", "link-arg=/PDBALTPATH:%_PDB%"]
+
+[target.x86_64-unknown-linux-musl]
+# link against the builder image's musl, which the SBOM lists
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-self-contained=no"]
+
+[target.aarch64-unknown-linux-musl]
+# a rustflag rather than `linker`, which would also apply to the build script (built for the host)
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-self-contained=no", "-C", "linker=./static-pie-cc"]
