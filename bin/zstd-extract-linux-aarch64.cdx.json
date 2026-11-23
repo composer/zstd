@@ -7,7 +7,7 @@
       "type": "application",
       "bom-ref": "zstd-extract",
       "name": "zstd-extract-linux-aarch64",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "supplier": {
         "name": "Composer",
         "url": [
@@ -17,7 +17,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "12f06a18d69849ffc1eb9aff6ff11c955872fa4fc1fe9ac868708a911093413c"
+          "content": "d8126035745efe5c0a680683a6cf311d3426c3e184ce89e0409d8d9da50b6e83"
         }
       ],
       "licenses": [
@@ -74,15 +74,15 @@
     },
     {
       "type": "library",
-      "bom-ref": "libgcc",
-      "name": "libgcc",
-      "version": "15.2.0-r5",
+      "bom-ref": "llvm-libunwind",
+      "name": "llvm-libunwind",
+      "version": "22.1.3-r0",
       "licenses": [
         {
-          "expression": "GPL-3.0-or-later WITH GCC-exception-3.1"
+          "expression": "Apache-2.0 WITH LLVM-exception"
         }
       ],
-      "purl": "pkg:apk/alpine/gcc@15.2.0-r5?arch=aarch64&distro=alpine-3.24"
+      "purl": "pkg:apk/alpine/llvm-libunwind-static@22.1.3-r0?arch=aarch64&distro=alpine-3.24"
     },
     {
       "type": "library",
@@ -97,6 +97,18 @@
         }
       ],
       "purl": "pkg:apk/alpine/fortify-headers@3.0.1-r2?arch=aarch64&distro=alpine-3.24"
+    },
+    {
+      "type": "library",
+      "bom-ref": "rust-std",
+      "name": "Rust standard library",
+      "version": "1.99.1",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:github/rust-lang/rust@1.99.1"
     }
   ],
   "dependencies": [
@@ -105,14 +117,20 @@
       "dependsOn": [
         "zstd",
         "musl",
-        "libgcc",
-        "fortify-headers"
+        "llvm-libunwind",
+        "fortify-headers",
+        "rust-std"
       ]
     }
   ],
   "formulation": [
     {
       "components": [
+        {
+          "type": "application",
+          "name": "rustc",
+          "version": "1.99.1"
+        },
         {
           "type": "application",
           "name": "gcc",
@@ -142,7 +160,7 @@
         {
           "type": "container",
           "name": "ghcr.io/composer/zstd-builder",
-          "version": "sha256:0ba4ec79a3cd95e656004e2fc527d8c160a450b83f733a49383f69f6ee48a968"
+          "version": "sha256:9ce6b88285858731f532d9540b8183a76a8853a94e28bca11644bf7f1e0eaf49"
         }
       ]
     }

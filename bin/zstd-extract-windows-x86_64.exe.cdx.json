@@ -7,7 +7,7 @@
       "type": "application",
       "bom-ref": "zstd-extract",
       "name": "zstd-extract-windows-x86_64.exe",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "supplier": {
         "name": "Composer",
         "url": [
@@ -17,7 +17,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "6b1f9e6e5cd34b566fc505f66be8d5b65d79dee0576e3ff22f17bc3f9056bca6"
+          "content": "8d1881fa1c49880cb55f2fa8128bc98771c50edd3e393f0673286733ef781c7a"
         }
       ],
       "licenses": [
@@ -83,6 +83,18 @@
           }
         }
       ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "rust-std",
+      "name": "Rust standard library",
+      "version": "1.99.1",
+      "licenses": [
+        {
+          "expression": "MIT OR Apache-2.0"
+        }
+      ],
+      "purl": "pkg:github/rust-lang/rust@1.99.1"
     }
   ],
   "dependencies": [
@@ -91,13 +103,19 @@
       "dependsOn": [
         "zstd",
         "vcruntime",
-        "ucrt"
+        "ucrt",
+        "rust-std"
       ]
     }
   ],
   "formulation": [
     {
       "components": [
+        {
+          "type": "application",
+          "name": "rustc",
+          "version": "1.99.1"
+        },
         {
           "type": "application",
           "name": "MSVC",
