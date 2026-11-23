@@ -57,9 +57,13 @@ rust_components() {
     case $crates in *miniz_oxide-*) crates=$(printf '%s\n' "$crates" adler2-auto) ;; esac
     [ "$(tc rustc)" = "$rustc_version" ] || { echo "$bin: built with rustc $(tc rustc), but $rustc_version is installed" >&2; exit 1; }
     local list=() crate name found lock_version
+    local -A seen=()
+    # detected versions sort before "auto", so a crate found in the binary wins
     for crate in $(printf '%s\n' "$crates" | sed '/^$/d' | sort -u); do
         name=${crate%-*}
         found=${crate##*-}
+        [ -z "${seen[$name]:-}" ] || continue
+        seen[$name]=1
         lock_version=$(awk -v n="$name" '$0 == "name = \"" n "\"" { getline; gsub(/version = |"/, ""); print; exit }' "$std_lock")
         [ -n "$lock_version" ] || { echo "$bin: $name is not one of std's dependencies" >&2; exit 1; }
         [ "$found" = auto ] || [ "$found" = "$lock_version" ] || { echo "$bin: $name $found, std uses $lock_version" >&2; exit 1; }
