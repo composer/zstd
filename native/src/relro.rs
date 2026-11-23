@@ -33,16 +33,19 @@ const SC_PAGESIZE: c_int = 30; // the same in glibc and musl
 
 extern "C" {
     fn dl_iterate_phdr(
-        cb: extern "C" fn(*mut PhdrInfo, usize, *mut c_void) -> c_int,
+        cb: unsafe extern "C" fn(*mut PhdrInfo, usize, *mut c_void) -> c_int,
         data: *mut c_void,
     ) -> c_int;
     fn mprotect(addr: *mut c_void, len: usize, prot: c_int) -> c_int;
     fn sysconf(name: c_int) -> c_long;
 }
 
-extern "C" fn protect(info: *mut PhdrInfo, _size: usize, _data: *mut c_void) -> c_int {
-    // SAFETY: dl_iterate_phdr passes a valid info whose phdr array has phnum entries
+/// # Safety
+/// info must point to a valid dl_phdr_info, as dl_iterate_phdr passes
+unsafe extern "C" fn protect(info: *mut PhdrInfo, _size: usize, _data: *mut c_void) -> c_int {
+    // SAFETY: valid per this function's contract
     let info = unsafe { &*info };
+    // SAFETY: dl_iterate_phdr gives the object's program headers, phnum of them
     let phdrs = unsafe { std::slice::from_raw_parts(info.phdr, usize::from(info.phnum)) };
     // SAFETY: no preconditions
     let page = unsafe { sysconf(SC_PAGESIZE) } as usize;

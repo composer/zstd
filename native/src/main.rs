@@ -19,6 +19,9 @@ use std::process::exit;
 #[cfg(target_os = "linux")]
 #[allow(unsafe_code)]
 mod relro;
+#[cfg(unix)]
+#[allow(unsafe_code)]
+mod sys;
 #[allow(unsafe_code)]
 mod zstd;
 
@@ -325,6 +328,14 @@ impl Ctx {
             ),
         };
         r.copy(Some(&mut f), size, rel);
+        /* some filesystems (NFS, quotas) only report write errors on close, which dropping a File ignores */
+        #[cfg(unix)]
+        if let Err(e) = sys::close(f) {
+            fail(
+                EXIT_IO,
+                format!("cannot write {}: {}", lossy(rel), err_str(&e)),
+            );
+        }
     }
 
     fn make_dir(&mut self, rel: &[u8]) {
@@ -424,19 +435,10 @@ impl Ctx {
 #[cfg(unix)]
 fn create(path: &Path, exec: bool) -> io::Result<File> {
     use std::os::unix::fs::OpenOptionsExt;
-    #[cfg(target_os = "linux")]
-    const O_NOFOLLOW: i32 = if cfg!(any(target_arch = "aarch64", target_arch = "arm")) {
-        0o100000
-    } else {
-        0o400000
-    };
-    #[cfg(target_vendor = "apple")]
-    const O_NOFOLLOW: i32 = 0x100;
-    /* O_EXCL never follows a symlink at the final component, O_NOFOLLOW is belt and braces */
+    /* create_new is O_CREAT | O_EXCL, which never follows a symlink at the final component */
     OpenOptions::new()
         .write(true)
         .create_new(true)
-        .custom_flags(O_NOFOLLOW)
         .mode(if exec { 0o777 } else { 0o666 })
         .open(path)
 }
