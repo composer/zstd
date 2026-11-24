@@ -165,7 +165,17 @@ final class Extractor
      */
     public static function validateFile(string $archive): void
     {
-        ZstdDecoder::scanFrames(self::read($archive));
+        $handle = @fopen($archive, 'rb');
+        if ($handle === false) {
+            throw new ExtractionException('Could not read '.$archive);
+        }
+        // only a few bytes per block are needed, not the default 8KB per seek
+        stream_set_read_buffer($handle, 0);
+        try {
+            ZstdDecoder::scanStream($handle);
+        } finally {
+            fclose($handle);
+        }
     }
 
     /**

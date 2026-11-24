@@ -105,22 +105,57 @@ final class ZstdDecoder
      */
     public static function scanFrames(string $src): array
     {
+        return self::scan(\strlen($src), static function (int $pos, int $n) use ($src): string {
+            return substr($src, $pos, $n);
+        });
+    }
+
+    /**
+     * scanFrames() for a file, reading only the frame and block headers.
+     *
+     * @internal
+     * @param resource $handle a seekable stream
+     * @return list<array{start: int, blocks: int, end: int, window: int, size: int, bound: int, checksum: bool}>
+     * @throws ExtractionException
+     */
+    public static function scanStream($handle): array
+    {
+        $stat = fstat($handle);
+        if ($stat === false) {
+            throw new ExtractionException('Could not stat the zstd stream');
+        }
+
+        return self::scan($stat['size'], static function (int $pos, int $n) use ($handle): string {
+            $data = $n > 0 && fseek($handle, $pos) === 0 ? fread($handle, $n) : false;
+            if ($data === false || \strlen($data) !== $n) {
+                throw new ExtractionException('Could not read the zstd stream');
+            }
+
+            return $data;
+        });
+    }
+
+    /**
+     * @param callable(int $pos, int $n): string $read returns exactly $n bytes at $pos, within $len
+     * @return list<array{start: int, blocks: int, end: int, window: int, size: int, bound: int, checksum: bool}>
+     */
+    private static function scan(int $len, callable $read): array
+    {
         if (\PHP_INT_SIZE < 8) {
             throw new ExtractionException('Parsing zstd frames requires a 64-bit PHP build');
         }
-        $len = \strlen($src);
         if ($len === 0) {
             throw new ExtractionException('Truncated zstd stream: unexpected end of file');
         }
         $pos = 0;
         $frames = [];
         while ($pos < $len) {
-            self::need($src, $pos, 4);
-            $magic = unpack('V', $src, $pos)[1];
+            self::need($len, $pos, 4);
+            $magic = unpack('V', $read($pos, 4))[1];
             if (($magic & 0xFFFFFFF0) === 0x184D2A50) {
-                self::need($src, $pos, 8);
-                $size = unpack('V', $src, $pos + 4)[1];
-                self::need($src, $pos + 8, $size);
+                self::need($len, $pos, 8);
+                $size = unpack('V', $read($pos + 4, 4))[1];
+                self::need($len, $pos + 8, $size);
                 $pos += 8 + $size;
                 continue;
             }
@@ -129,8 +164,8 @@ final class ZstdDecoder
             }
 
             $start = $pos;
-            self::need($src, $pos, 5);
-            $fhd = \ord($src[$pos + 4]);
+            self::need($len, $pos, 5);
+            $fhd = \ord($read($pos + 4, 1));
             $pos += 5;
             if (($fhd & 8) !== 0) {
                 throw new ExtractionException('Reserved zstd frame header bit set');
@@ -138,33 +173,36 @@ final class ZstdDecoder
             $singleSegment = ($fhd >> 5) & 1;
             $dictIdSize = [0, 1, 2, 4][$fhd & 3];
             $fcsSize = [$singleSegment, 2, 4, 8][$fhd >> 6];
-            self::need($src, $pos, 1 - $singleSegment + $dictIdSize + $fcsSize);
+            $headerSize = 1 - $singleSegment + $dictIdSize + $fcsSize;
+            self::need($len, $pos, $headerSize);
+            $h = $read($pos, $headerSize);
+            $pos += $headerSize;
+            $o = 0;
             $window = 0;
             if ($singleSegment === 0) {
-                $wd = \ord($src[$pos++]);
+                $wd = \ord($h[$o++]);
                 $windowBase = 1 << (10 + ($wd >> 3));
                 $window = $windowBase + ($windowBase >> 3) * ($wd & 7);
             }
             $dictId = 0;
             for ($i = 0; $i < $dictIdSize; $i++) {
-                $dictId |= \ord($src[$pos + $i]) << (8 * $i);
+                $dictId |= \ord($h[$o + $i]) << (8 * $i);
             }
             if ($dictId !== 0) {
                 throw new ExtractionException('zstd frame requires dictionary '.$dictId);
             }
-            $pos += $dictIdSize;
+            $o += $dictIdSize;
             if ($fcsSize === 0) {
                 $size = -1;
             } elseif ($fcsSize === 1) {
-                $size = \ord($src[$pos]);
+                $size = \ord($h[$o]);
             } elseif ($fcsSize === 2) {
-                $size = unpack('v', $src, $pos)[1] + 256;
+                $size = unpack('v', $h, $o)[1] + 256;
             } elseif ($fcsSize === 4) {
-                $size = unpack('V', $src, $pos)[1];
+                $size = unpack('V', $h, $o)[1];
             } else {
-                $size = unpack('P', $src, $pos)[1];
+                $size = unpack('P', $h, $o)[1];
             }
-            $pos += $fcsSize;
             // 2^64-1 (-1 here) means unknown to libzstd too, other sizes over 2^63 can never match
             if ($size < -1) {
                 throw new ExtractionException('zstd frame content size mismatch');
@@ -182,8 +220,9 @@ final class ZstdDecoder
             $blockMax = min($window, self::BLOCK_SIZE_MAX);
             $bound = 0;
             do {
-                self::need($src, $pos, 3);
-                $bh = \ord($src[$pos]) | (\ord($src[$pos + 1]) << 8) | (\ord($src[$pos + 2]) << 16);
+                self::need($len, $pos, 3);
+                $b = $read($pos, 3);
+                $bh = \ord($b[0]) | (\ord($b[1]) << 8) | (\ord($b[2]) << 16);
                 $pos += 3;
                 $type = ($bh >> 1) & 3;
                 $blockSize = $bh >> 3;
@@ -194,13 +233,13 @@ final class ZstdDecoder
                     throw new ExtractionException('zstd block larger than the maximum block size');
                 }
                 $stored = $type === 1 ? 1 : $blockSize;
-                self::need($src, $pos, $stored);
+                self::need($len, $pos, $stored);
                 $pos += $stored;
                 $bound += $type === 2 ? $blockMax : $blockSize;
             } while (($bh & 1) === 0);
             $checksum = ($fhd & 4) !== 0;
             if ($checksum) {
-                self::need($src, $pos, 4);
+                self::need($len, $pos, 4);
                 $pos += 4;
             }
             $frames[] = ['start' => $start, 'blocks' => $blocks, 'end' => $pos, 'window' => $window, 'size' => $size, 'bound' => $size >= 0 ? $size : $bound, 'checksum' => $checksum];
@@ -240,9 +279,9 @@ final class ZstdDecoder
         return new ExtractionException('Decompressed size exceeds the limit of '.$maxSize.' bytes');
     }
 
-    private static function need(string $src, int $pos, int $n): void
+    private static function need(int $len, int $pos, int $n): void
     {
-        if ($pos + $n > \strlen($src)) {
+        if ($pos + $n > $len) {
             throw new ExtractionException('Truncated zstd stream: unexpected end of file');
         }
     }
