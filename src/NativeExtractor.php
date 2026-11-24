@@ -360,11 +360,7 @@ final class NativeExtractor
             throw new ExtractionException('No cache directory available to copy the binary to');
         }
         $dir = rtrim($dir, '/\\').'/zstd';
-        $uid = self::ensurePrivateDir($dir);
-        if ($uid !== null) {
-            // only the resolved path was verified, a symlink on the way to it could be repointed later
-            $dir = (string) realpath($dir);
-        }
+        [$dir, $uid] = self::ensurePrivateDir($dir);
 
         $target = $dir.'/'.substr($hash, 0, 16).'-'.$name;
         $handle = $this->openVerified($target, $hash, $uid);
@@ -431,9 +427,10 @@ final class NativeExtractor
      * Makes sure $dir is a directory only the current user can write to, and that it cannot be swapped by
      * anyone else either (every ancestor is owned by us or root, and sticky if writable by others).
      *
-     * @return int|null the current user id, null on Windows where ACLs are not checked
+     * @return array{string, int|null} the resolved directory to use from here on, and the current user id (null
+     *                                 on Windows where ACLs are not checked)
      */
-    private static function ensurePrivateDir(string $dir): ?int
+    private static function ensurePrivateDir(string $dir): array
     {
         if (!is_dir($dir)) {
             @mkdir($dir, 0700, true);
@@ -443,7 +440,13 @@ final class NativeExtractor
             throw new ExtractionException($dir.' is not a directory');
         }
         if (Filesystem::isWindows()) {
-            return null;
+            return [$dir, null];
+        }
+
+        // every check is about the resolved path, a symlink on the way to $dir could be repointed between them
+        $dir = realpath($dir);
+        if ($dir === false) {
+            throw new ExtractionException('Could not resolve the cache directory');
         }
 
         // the owner of a file we create is our effective uid, without requiring ext-posix
@@ -470,13 +473,11 @@ final class NativeExtractor
             }
         }
 
-        $path = realpath($dir);
-        if ($path === false) {
-            throw new ExtractionException('Could not resolve '.$dir);
-        }
+        $path = $dir;
         while (($parent = \dirname($path)) !== $path) {
             $path = $parent;
-            $s = @stat($path);
+            // lstat: a resolved path has no symlinks, one showing up now must not be followed
+            $s = @lstat($path);
             if ($s === false) {
                 throw new ExtractionException('Could not stat '.$path);
             }
@@ -488,7 +489,7 @@ final class NativeExtractor
             }
         }
 
-        return $uid;
+        return [$dir, $uid];
     }
 
     /**

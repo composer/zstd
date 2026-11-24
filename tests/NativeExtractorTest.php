@@ -167,6 +167,24 @@ class NativeExtractorTest extends TestCase
     }
 
     /**
+     * The checks are about the resolved directory, so that is the one the binary must be run from.
+     */
+    public function testCacheDirBehindASymlinkIsUsedByItsResolvedPath(): void
+    {
+        if (Filesystem::isWindows()) {
+            self::markTestSkipped('Not on Windows');
+        }
+        mkdir($this->tmp.'/real');
+        symlink($this->tmp.'/real', $this->tmp.'/link');
+
+        $extractor = new Extractor($this->tmp.'/link', [Extractor::METHOD_BUNDLED], 'file://'.$this->requireBinary());
+        $command = $extractor->prepare($this->archive(), $this->tmp.'/dest')->getCommand();
+
+        self::assertNotNull($command);
+        self::assertSame(realpath($this->tmp.'/real/zstd'), \dirname($command[0]));
+    }
+
+    /**
      * On Linux the verified file is executed through its open handle, so swapping it afterwards has no effect.
      */
     public function testSwappingTheCopyAfterVerificationHasNoEffectOnLinux(): void
