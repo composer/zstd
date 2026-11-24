@@ -348,9 +348,9 @@ final class NativeExtractor
      *
      * Swapping the file between the hash check and execution requires write access to that directory, which is
      * verified to be only possible for the current user (or root), who could tamper with this PHP process anyway.
-     * On Linux the race is closed entirely: the verified file stays open and is executed through /proc/self/fd.
-     */
-    /**
+     * In extract() on Linux the race is closed entirely: the verified file stays open and is executed through
+     * /proc/self/fd. getCommand() runs it by path on every platform.
+     *
      * @param callable(): string $contents only called when no verified copy exists yet
      */
     private function prepareCopy(string $name, string $hash, callable $contents): string
