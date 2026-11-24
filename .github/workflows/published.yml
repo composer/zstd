@@ -1,0 +1,40 @@
+name: "Published binaries"
+
+# Composer downloads the binaries from getcomposer.org, so this fails until the ones in bin/ are published there
+# (run update-zstd.sh in getcomposer.org's repo, commit and deploy, then re-run this).
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: "Check getcomposer.org"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download the binaries from getcomposer.org
+        run: |
+          set -euo pipefail
+          missing=0
+          while read -r hash name; do
+            case "$name" in *.cdx.json) continue ;; esac
+            url="https://getcomposer.org/zstd/$hash/$name"
+            if ! curl -fsSL --retry 3 "$url" -o "$RUNNER_TEMP/$name" || [ "$(sha256sum "$RUNNER_TEMP/$name" | cut -d' ' -f1)" != "$hash" ]; then
+              echo "::error::$name is not published at $url"
+              missing=1
+            fi
+          done < bin/SHA256SUMS
+          exit $missing
