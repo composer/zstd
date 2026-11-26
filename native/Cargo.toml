@@ -9,7 +9,15 @@ license = "MIT"
 publish = false
 build = "build.rs"
 
-# no dependencies: the decoder is the vendored zstd/ (see build.rs), everything else is std
+[dependencies]
+# the zstd decoder, without unsafe code (its simd feature would bring in a crate with some, for no measurable gain
+# here). Pinned exactly and vendored, as the Linux build runs offline: review the changes when updating with
+# `RUSTC_BOOTSTRAP=1 cargo vendor vendor`
+zrip-decode = { version = "=0.8.22", default-features = false, features = ["std"] }
+
+[patch.crates-io]
+zrip-core = { path = "vendor/zrip-core" }
+zrip-decode = { path = "vendor/zrip-decode" }
 
 [profile.release]
 opt-level = 3

@@ -108,10 +108,10 @@ class BadActorTest extends TestCase
             'skippable frame only' => [pack('V', 0x184D2A50).pack('V', 0), '{truncated}i'],
             'window too large' => [TarBuilder::zstdFrame(str_pad($valid->build(), 200000, "\0"), 28), '{too much memory|window|memory limit}i'],
             'dictionary required' => [TarBuilder::zstdFrame($valid->build(), null, false, 1234), '{dictionary}i'],
-            'reserved header bit' => [substr_replace($zst, \chr(\ord($zst[4]) | 8), 4, 1), '{reserved|unsupported|frame parameter|corrupt}i'],
-            'reserved block type' => [substr_replace($zst, \chr(\ord($zst[13]) | 6), 13, 1), '{reserved|corrupt}i'],
+            'reserved header bit' => [substr_replace($zst, \chr(\ord($zst[4]) | 8), 4, 1), '{reserved|unsupported|frame parameter|malformed frame header|corrupt}i'],
+            'reserved block type' => [substr_replace($zst, \chr(\ord($zst[13]) | 6), 13, 1), '{reserved|unknown block type|corrupt}i'],
             'content size over 2^63' => [substr_replace(TarBuilder::zstdFrame($valid->build(), 20), pack('P', -5), 6, 8), '{size|corrupt}i'],
-            'matches beyond the block size' => [TarBuilder::matchBomb(30000), '{maximum block size|buffer is too small|corrupt}i'],
+            'matches beyond the block size' => [TarBuilder::matchBomb(30000), '{maximum block size|block size exceeds maximum|buffer is too small|corrupt}i'],
             'content size mismatch' => [substr_replace($zst, pack('P', 9999), 5, 8), '{size|corrupt}i'],
         ];
         if (ZstdDecoder::canVerifyChecksums()) {

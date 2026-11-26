@@ -26,7 +26,7 @@ mod sys;
 mod zstd;
 
 const EXTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-const WINDOW_LOG_MAX: i32 = 27;
+const WINDOW_LOG_MAX: u32 = 27;
 const MAX_REL: usize = 4096;
 /* every component costs a lookup in each filesystem call on the path */
 const MAX_DEPTH: usize = 128;
@@ -120,7 +120,6 @@ struct Reader {
     input: Vec<u8>,
     in_pos: usize,
     in_len: usize,
-    last_ret: usize,
     out: Vec<u8>,
     out_len: usize,
     pos: usize,
@@ -130,17 +129,13 @@ struct Reader {
 
 impl Reader {
     fn new(f: File, max_size: u64) -> Reader {
-        let ds =
-            zstd::Stream::new(WINDOW_LOG_MAX).unwrap_or_else(|| fail(EXIT_IO, "out of memory"));
-        let (in_size, out_size) = (zstd::in_size(), zstd::out_size());
         Reader {
             f,
-            ds,
-            input: vec![0; in_size],
+            ds: zstd::Stream::new(WINDOW_LOG_MAX),
+            input: vec![0; zstd::IN_SIZE],
             in_pos: 0,
             in_len: 0,
-            last_ret: 0,
-            out: vec![0; out_size],
+            out: vec![0; zstd::OUT_SIZE],
             out_len: 0,
             pos: 0,
             total: 0,
@@ -153,10 +148,10 @@ impl Reader {
         self.pos = 0;
         self.out_len = 0;
         while self.out_len == 0 {
-            if self.in_pos == self.in_len {
+            if self.in_pos == self.in_len && !self.ds.has_pending_output() {
                 let n = read_some(&mut self.f, &mut self.input);
                 if n == 0 {
-                    if self.last_ret != 0 {
+                    if self.ds.finish().is_err() {
                         fail(EXIT_INVALID, "truncated zstd stream");
                     }
                     return false;
@@ -164,11 +159,10 @@ impl Reader {
                 self.in_pos = 0;
                 self.in_len = n;
             }
-            let (n, ret) = self
+            let n = self
                 .ds
                 .decompress(&self.input[..self.in_len], &mut self.in_pos, &mut self.out)
                 .unwrap_or_else(|e| fail(EXIT_INVALID, format!("zstd: {e}")));
-            self.last_ret = ret;
             self.out_len = n;
             self.total += n as u64;
             if self.total > self.max_size {
@@ -855,9 +849,9 @@ fn main() {
             .map(|l| format!(", {l}"))
             .unwrap_or_default();
         println!(
-            "zstd-extract {} (zstd {}, rustc {}{})",
+            "zstd-extract {} (zrip-decode {}, rustc {}{})",
             EXTRACT_VERSION,
-            zstd::version(),
+            zstd::VERSION,
             env!("EXTRACT_RUSTC"),
             libc
         );
