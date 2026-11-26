@@ -12,7 +12,7 @@ docker run --rm --network none -v "$PWD:/src:ro" -v "$PWD/build:/out" -e OWNER="
     version() { apk --no-network info -v 2>/dev/null | sed -n "s/^$1-\([0-9].*\)/\1/p"; }
     arch=$(uname -m)
     mkdir /tmp/native
-    cp -r /src/.cargo /src/static-pie-cc /src/Cargo.toml /src/Cargo.lock /src/rust-toolchain.toml /src/build.rs /src/src /src/zstd /tmp/native/
+    cp -r /src/.cargo /src/static-pie-cc /src/Cargo.toml /src/Cargo.lock /src/rust-toolchain.toml /src/build.rs /src/src /src/vendor /tmp/native/
     cd /tmp/native
     EXTRACT_LIBC="musl $(version musl)" RUSTC_BOOTSTRAP=1 cargo build -q --release --locked --offline --target "$arch-unknown-linux-musl"
     echo "#include <string.h>" | gcc -O2 -D_FORTIFY_SOURCE=2 -E - | grep -q /fortify/string.h # fortify is really on

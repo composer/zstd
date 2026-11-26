@@ -159,13 +159,18 @@ class ExtractorTest extends TestCase
     }
 
     /**
-     * libzstd decodes frames declaring a small content size in a single pass, without applying the window limit.
+     * libzstd decodes frames declaring a small content size in a single pass, without applying the window limit,
+     * the bundled binary's decoder applies it to every frame.
      *
      * @dataProvider provideMethods
      */
-    public function testSmallFrameDeclaringHugeWindowIsAccepted(string $method): void
+    public function testSmallFrameDeclaringHugeWindow(string $method): void
     {
         $tar = (new TarBuilder())->file('a', 'x')->build();
+        if ($method === Extractor::METHOD_BUNDLED) {
+            $this->expectException(ExtractionException::class);
+            $this->expectExceptionMessage('window size 1073741824 exceeds max 134217728');
+        }
         self::assertSame(['a' => 'file:x'], $this->extract($method, TarBuilder::zstdFrame($tar, 30)));
     }
 
@@ -271,7 +276,8 @@ class ExtractorTest extends TestCase
                     $reference = $tree;
                     self::assertSame(self::link('sub/run.sh'), $tree['link-to-script']);
                     self::assertSame(self::link('../mem.h'), $tree['sub/up-link']);
-                    self::assertSame(file_get_contents(\dirname(__DIR__).'/native/zstd/common/mem.h'), file_get_contents($dest.'/mem.h'));
+                    // zstd 1.5.7's lib/common/mem.h, see Fixtures/generate.sh
+                    self::assertSame('4dd5fe76fa30a020cd4b3af3134ae143920300a1fe54baac1a5da73297e66783', hash_file('sha256', $dest.'/mem.h'));
                 }
                 self::assertSame($reference, $tree, basename($fixture).' via '.$method);
             }

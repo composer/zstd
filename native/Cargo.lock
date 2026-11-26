@@ -3,5 +3,19 @@
 version = 4
 
 [[package]]
+name = "zrip-core"
+version = "0.14.4"
+
+[[package]]
+name = "zrip-decode"
+version = "0.8.22"
+dependencies = [
+ "zrip-core",
+]
+
+[[package]]
 name = "zstd-extract"
 version = "1.1.0"
+dependencies = [
+ "zrip-decode",
+]
