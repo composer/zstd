@@ -7,7 +7,7 @@ export MACOSX_DEPLOYMENT_TARGET=11.0
 rustup toolchain install
 rustup target add x86_64-apple-darwin aarch64-apple-darwin
 for target in x86_64-apple-darwin aarch64-apple-darwin; do
-    cargo build -q --release --locked --target "$target"
+    RUSTC_BOOTSTRAP=1 cargo build -q --release --locked --target "$target"
 done
 mkdir -p build
 bin=build/zstd-extract-darwin

@@ -8,6 +8,8 @@ call "%VSDIR%\VC\Auxiliary\Build\vcvarsall.bat" x64 >nul || exit /b 1
 cd /d "%~dp0"
 rem installs the version from rust-toolchain.toml
 rustup toolchain install || exit /b 1
+rem for the unstable settings in Cargo.toml and .cargo\config.toml
+set RUSTC_BOOTSTRAP=1
 cargo build -q --release --locked --target x86_64-pc-windows-msvc || exit /b 1
 if not exist build mkdir build
 copy /y target\x86_64-pc-windows-msvc\release\zstd-extract.exe build\zstd-extract-windows-x86_64.exe >nul || exit /b 1

@@ -34,40 +34,24 @@ tool() {
     jq -n --arg name "$1" --arg version "$2" '{type: "application", name: $name, version: $version}'
 }
 
-# crates.io crates std is built from, with their licenses
+# crates.io crates of std that end up in the binary, with their licenses. With panic = "immediate-abort" the
+# backtrace printing (gimli, addr2line, object, ...) is gone: hashbrown backs HashMap, and libc is used by std
+# everywhere but on Windows. The binary has no source paths left to find them by, check with nm on an unstripped
+# build after a toolchain update.
 declare -A crate_license=(
-    [addr2line]="Apache-2.0 OR MIT"
-    [adler2]="0BSD OR MIT OR Apache-2.0"
-    [gimli]="MIT OR Apache-2.0"
     [hashbrown]="MIT OR Apache-2.0"
     [libc]="MIT OR Apache-2.0"
-    [miniz_oxide]="MIT OR Zlib OR Apache-2.0"
-    [object]="Apache-2.0 OR MIT"
-    [rustc-demangle]="MIT OR Apache-2.0"
 )
 
-# Rust's std and the crates it brings into the binary. Crates with panic messages carry their source path,
-# /rust/deps/<name>-<version>/, the others are known to be there: hashbrown backs HashMap, libc and object are
-# used by std everywhere but on Windows, adler2 by miniz_oxide.
+# Rust's std and the crates it brings into the binary
 rust_components() {
-    local bin=$1 windows=$2 crates
-    crates=$(LC_ALL=C grep -aoE '/rust/deps[/\\][A-Za-z0-9_-]+-[0-9][0-9A-Za-z.+-]*[/\\]' "$bin" | sed -E 's#^/rust/deps.##; s#.$##' | sort -u)
-    crates=$(printf '%s\n' "$crates" hashbrown-auto)
-    [ "$windows" = 1 ] || crates=$(printf '%s\n' "$crates" libc-auto object-auto)
-    case $crates in *miniz_oxide-*) crates=$(printf '%s\n' "$crates" adler2-auto) ;; esac
+    local bin=$1 windows=$2 crates=hashbrown
+    [ "$windows" = 1 ] || crates="$crates libc"
     [ "$(tc rustc)" = "$rustc_version" ] || { echo "$bin: built with rustc $(tc rustc), but $rustc_version is installed" >&2; exit 1; }
-    local list=() crate name found lock_version
-    local -A seen=()
-    # detected versions sort before "auto", so a crate found in the binary wins
-    for crate in $(printf '%s\n' "$crates" | sed '/^$/d' | sort -u); do
-        name=${crate%-*}
-        found=${crate##*-}
-        [ -z "${seen[$name]:-}" ] || continue
-        seen[$name]=1
+    local list=() name lock_version
+    for name in $crates; do
         lock_version=$(awk -v n="$name" '$0 == "name = \"" n "\"" { getline; gsub(/version = |"/, ""); print; exit }' "$std_lock")
         [ -n "$lock_version" ] || { echo "$bin: $name is not one of std's dependencies" >&2; exit 1; }
-        [ "$found" = auto ] || [ "$found" = "$lock_version" ] || { echo "$bin: $name $found, std uses $lock_version" >&2; exit 1; }
-        [ -n "${crate_license[$name]:-}" ] || { echo "$bin: unknown crate $name, add its license to sbom.sh" >&2; exit 1; }
         list+=("$(jq -n --arg name "$name" --arg version "$lock_version" --arg license "${crate_license[$name]}" '{
             type: "library", "bom-ref": "crate-\($name)", name: $name, version: $version,
             description: "Part of the Rust standard library build",
@@ -97,10 +81,9 @@ for name in zstd-extract-linux-x86_64 zstd-extract-linux-aarch64 zstd-extract-da
         *-linux-*)
             arch=${name##*-}
             image=$(tc image)
-            # linked statically: libc, unwinder, the inlined checks of the C part, and Rust's std
+            # linked statically: libc, the inlined checks of the C part, and Rust's std (nothing of libunwind is left)
             linked=$(jq -n '$ARGS.positional | map(fromjson)' --args \
                 "$(apk musl musl MIT)" \
-                "$(apk llvm-libunwind llvm-libunwind-static 'Apache-2.0 WITH LLVM-exception')" \
                 "$(apk fortify-headers fortify-headers 0BSD)")
             tools=$(jq -n '$ARGS.positional | map(fromjson)' --args \
                 "$(tool rustc "$(tc rustc)")" \
