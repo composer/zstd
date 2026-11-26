@@ -7,7 +7,7 @@
       "type": "application",
       "bom-ref": "zstd-extract",
       "name": "zstd-extract-windows-x86_64.exe",
-      "version": "1.1.0",
+      "version": "",
       "supplier": {
         "name": "Composer",
         "url": [
@@ -17,7 +17,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "0379a0327975bed918d9b49f84be37ffc797b2c4b3b027affbbd9fab20f855ee"
+          "content": "4524e762bbd0f5fa52b1db96bab47a97c17cd5ef5fb998cec7eb9fe927dce7c5"
         }
       ],
       "licenses": [
@@ -122,19 +122,6 @@
         }
       ],
       "purl": "pkg:cargo/hashbrown@0.17.1"
-    },
-    {
-      "type": "library",
-      "bom-ref": "crate-rustc-demangle",
-      "name": "rustc-demangle",
-      "version": "0.1.28",
-      "description": "Part of the Rust standard library build",
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "purl": "pkg:cargo/rustc-demangle@0.1.28"
     }
   ],
   "dependencies": [
@@ -146,8 +133,7 @@
         "ucrt",
         "rust-std",
         "compiler-builtins",
-        "crate-hashbrown",
-        "crate-rustc-demangle"
+        "crate-hashbrown"
       ]
     }
   ],

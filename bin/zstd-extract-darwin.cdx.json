@@ -7,7 +7,7 @@
       "type": "application",
       "bom-ref": "zstd-extract",
       "name": "zstd-extract-darwin",
-      "version": "1.1.0",
+      "version": "",
       "supplier": {
         "name": "Composer",
         "url": [
@@ -17,7 +17,7 @@
       "hashes": [
         {
           "alg": "SHA-256",
-          "content": "07219b1829b71d9caee392824250252677026675869b40cff5ac27fc958018e3"
+          "content": "4f802308893593b5cd70ae922f82455f63d6710175702abae6262271be3e88d4"
         }
       ],
       "licenses": [
@@ -86,32 +86,6 @@
     },
     {
       "type": "library",
-      "bom-ref": "crate-addr2line",
-      "name": "addr2line",
-      "version": "0.27.1",
-      "description": "Part of the Rust standard library build",
-      "licenses": [
-        {
-          "expression": "Apache-2.0 OR MIT"
-        }
-      ],
-      "purl": "pkg:cargo/addr2line@0.27.1"
-    },
-    {
-      "type": "library",
-      "bom-ref": "crate-gimli",
-      "name": "gimli",
-      "version": "0.34.0",
-      "description": "Part of the Rust standard library build",
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "purl": "pkg:cargo/gimli@0.34.0"
-    },
-    {
-      "type": "library",
       "bom-ref": "crate-hashbrown",
       "name": "hashbrown",
       "version": "0.17.1",
@@ -135,32 +109,6 @@
         }
       ],
       "purl": "pkg:cargo/libc@0.2.189"
-    },
-    {
-      "type": "library",
-      "bom-ref": "crate-object",
-      "name": "object",
-      "version": "0.39.1",
-      "description": "Part of the Rust standard library build",
-      "licenses": [
-        {
-          "expression": "Apache-2.0 OR MIT"
-        }
-      ],
-      "purl": "pkg:cargo/object@0.39.1"
-    },
-    {
-      "type": "library",
-      "bom-ref": "crate-rustc-demangle",
-      "name": "rustc-demangle",
-      "version": "0.1.28",
-      "description": "Part of the Rust standard library build",
-      "licenses": [
-        {
-          "expression": "MIT OR Apache-2.0"
-        }
-      ],
-      "purl": "pkg:cargo/rustc-demangle@0.1.28"
     }
   ],
   "dependencies": [
@@ -170,12 +118,8 @@
         "zstd",
         "rust-std",
         "compiler-builtins",
-        "crate-addr2line",
-        "crate-gimli",
         "crate-hashbrown",
-        "crate-libc",
-        "crate-object",
-        "crate-rustc-demangle"
+        "crate-libc"
       ]
     }
   ],
